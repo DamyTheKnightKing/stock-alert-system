@@ -1,11 +1,21 @@
-yfinance==0.2.51
-pandas==2.2.3
-pandas-ta==0.3.14b
-numpy==1.26.4
-SQLAlchemy==2.0.36
-python-dotenv==1.0.1
-PyYAML==6.0.2
-requests==2.32.3
-schedule==1.2.2
-jinja2==3.1.4
-tabulate==0.9.0
+# Core data
+yfinance>=0.2.51
+pandas>=2.0.0
+pandas-ta>=0.3.14b
+numpy>=1.24.0
+
+# Storage
+SQLAlchemy>=2.0.0
+
+# Config & env
+python-dotenv>=1.0.0
+PyYAML>=6.0.0
+
+# HTTP
+requests>=2.31.0
+
+# Notifications
+jinja2>=3.1.0
+
+# CLI output
+tabulate>=0.9.0
