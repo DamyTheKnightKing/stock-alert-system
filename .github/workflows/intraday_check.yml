@@ -1,0 +1,38 @@
+name: Intraday Signal Check
+
+on:
+  schedule:
+    # Every 30 minutes during US market hours (9:30 AM – 4:00 PM ET = 14:30–21:00 UTC)
+    - cron: "0,30 14-20 * * 1-5"
+    - cron: "0 21 * * 1-5"    # Final check at market close
+  workflow_dispatch:
+
+jobs:
+  intraday-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create required directories
+        run: mkdir -p data logs
+
+      - name: Run intraday check
+        env:
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+          DATABASE_URL: sqlite:///data/stock_alerts.db
+          LOG_LEVEL: INFO
+        run: python -m src.main intraday

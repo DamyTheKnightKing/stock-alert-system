@@ -1,0 +1,45 @@
+name: Daily Stock Analysis
+
+on:
+  schedule:
+    # 8:30 AM ET = 13:30 UTC (before US market opens)
+    - cron: "30 13 * * 1-5"   # Mon–Fri only
+  workflow_dispatch:            # allow manual trigger from GitHub UI
+
+jobs:
+  daily-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create required directories
+        run: mkdir -p data logs
+
+      - name: Run daily analysis
+        env:
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+          DATABASE_URL: sqlite:///data/stock_alerts.db
+          LOG_LEVEL: INFO
+        run: python -m src.main daily
+
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-analysis-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 7

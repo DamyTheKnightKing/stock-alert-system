@@ -1,0 +1,55 @@
+# Stock Alert System — Configuration
+
+system:
+  name: "Stock Alert System"
+  timezone: "America/New_York"
+  log_level: INFO
+
+data:
+  # Primary source: yfinance (free, no API key)
+  primary_source: yfinance
+  # Lookback window for historical data
+  history_period: "1y"
+  # Intraday interval for real-time checks
+  intraday_interval: "5m"
+  intraday_period: "5d"
+
+technical:
+  # Moving averages
+  sma_short: 20
+  sma_medium: 50
+  sma_long: 200
+  # RSI
+  rsi_period: 14
+  rsi_overbought: 70
+  rsi_oversold: 30
+  rsi_prewarning_high: 65   # Pre-signal: approaching overbought
+  rsi_prewarning_low: 35    # Pre-signal: approaching oversold
+  # MACD
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  # Volume
+  volume_spike_multiplier: 1.5  # 1.5x avg volume = spike
+  # Support/Resistance
+  sr_window: 20              # Rolling window for S/R levels
+
+alerts:
+  # Price proximity threshold for pre-signals (%)
+  resistance_proximity_pct: 1.5
+  support_proximity_pct: 1.5
+  # Minimum confidence to trigger alert (1-10)
+  min_confidence: 6
+
+notifications:
+  email:
+    enabled: true
+    # Market open pre-analysis: 8:30 AM ET
+    # End-of-day summary: 4:30 PM ET
+    send_on_signal_only: false   # false = always send daily summary
+  subject_prefix: "[StockAlert]"
+
+storage:
+  # SQLite: free, zero setup, file-based
+  # Upgrade path: set DATABASE_URL env var to PostgreSQL/Supabase
+  retention_days: 90   # Keep 90 days of alerts

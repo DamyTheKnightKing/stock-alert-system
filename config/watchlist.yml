@@ -1,0 +1,87 @@
+# Stock Alert System — Watchlist Configuration
+# ETF-first strategy: always include broad market ETFs as baseline
+
+watchlist:
+  # --- Broad Market ETFs (always watch) ---
+  - symbol: SPY
+    name: "S&P 500 ETF"
+    type: ETF
+    priority: high
+
+  - symbol: QQQ
+    name: "Nasdaq-100 ETF"
+    type: ETF
+    priority: high
+
+  - symbol: VTI
+    name: "Total US Market ETF"
+    type: ETF
+    priority: high
+
+  - symbol: IWM
+    name: "Russell 2000 Small Cap ETF"
+    type: ETF
+    priority: medium
+
+  # --- Sector ETFs ---
+  - symbol: XLK
+    name: "Technology Sector ETF"
+    type: ETF
+    priority: medium
+
+  - symbol: XLF
+    name: "Financial Sector ETF"
+    type: ETF
+    priority: medium
+
+  - symbol: XLE
+    name: "Energy Sector ETF"
+    type: ETF
+    priority: medium
+
+  - symbol: XLV
+    name: "Healthcare Sector ETF"
+    type: ETF
+    priority: medium
+
+  # --- Macro / Risk Barometers ---
+  - symbol: GLD
+    name: "Gold ETF"
+    type: ETF
+    priority: high
+
+  - symbol: TLT
+    name: "20+ Year Treasury Bond ETF"
+    type: ETF
+    priority: high
+
+  - symbol: VXX
+    name: "VIX Short-Term Futures ETF"
+    type: ETF
+    priority: medium
+
+  # --- Individual Stocks (strong alpha candidates only) ---
+  - symbol: AAPL
+    name: "Apple Inc."
+    type: stock
+    priority: medium
+
+  - symbol: NVDA
+    name: "NVIDIA Corporation"
+    type: stock
+    priority: high
+
+  - symbol: MSFT
+    name: "Microsoft Corporation"
+    type: stock
+    priority: medium
+
+  - symbol: TSLA
+    name: "Tesla Inc."
+    type: stock
+    priority: low
+
+  - symbol: AMZN
+    name: "Amazon.com Inc."
+    type: stock
+    priority: medium

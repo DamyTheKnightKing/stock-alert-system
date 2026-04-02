@@ -1,0 +1,27 @@
+# Environment
+.env
+*.env
+
+# Data & logs (not committed — ephemeral in CI)
+data/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
