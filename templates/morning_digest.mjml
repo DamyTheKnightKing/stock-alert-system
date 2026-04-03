@@ -340,46 +340,49 @@
     <mj-section background-color="#f0f2f5" padding="6px 0" />
 
     <!-- ═══════════════════════════════════════════ FULL WATCHLIST TABLE -->
-    <mj-section background-color="#ffffff" padding="16px 24px 4px 24px">
+    <mj-raw>
+      <style>
+        @media only screen and (max-width: 480px) {
+          .watchlist td, .watchlist th { padding: 6px 5px !important; font-size: 10px !important; }
+          .watchlist .sym { font-size: 11px !important; }
+        }
+      </style>
+    </mj-raw>
+
+    <mj-section background-color="#ffffff" padding="16px 16px 4px 16px">
       <mj-column>
         <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
                  letter-spacing="1px" color="#888" padding="0 0 12px 0"
                  border-bottom="1px solid #f0f0f0">
           Full Watchlist Snapshot
         </mj-text>
-        <mj-table font-size="12px" color="#1a1a2e" padding="0">
+        <mj-table css-class="watchlist" font-size="12px" color="#1a1a2e" padding="0" width="100%">
           <tr style="background:#f0f2f5;">
-            <th style="padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Symbol</th>
-            <th style="padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Price</th>
-            <th style="padding:8px 10px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Trend</th>
-            <th style="padding:8px 10px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">RSI</th>
-            <th style="padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Support</th>
-            <th style="padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Resist.</th>
-            <th style="padding:8px 10px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Stance</th>
+            <th style="padding:8px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Symbol</th>
+            <th style="padding:8px 6px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Price</th>
+            <th style="padding:8px 6px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Trend</th>
+            <th style="padding:8px 6px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">RSI</th>
+            <th style="padding:8px 6px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Stance</th>
           </tr>
           {% for a in all_analyses %}
           {% set trend_color = '#2ecc71' if a.trend == 'BULLISH' else '#e74c3c' if a.trend == 'BEARISH' else '#f39c12' %}
+          {% set trend_short = 'BULL' if a.trend == 'BULLISH' else 'BEAR' if a.trend == 'BEARISH' else 'SIDE' %}
           {% set stance_bg = '#d4edda' if a.lt_stance == 'ACCUMULATE' else '#f8d7da' if a.lt_stance == 'AVOID' else '#e2e3e5' %}
           {% set stance_color = '#1a7a4a' if a.lt_stance == 'ACCUMULATE' else '#721c24' if a.lt_stance == 'AVOID' else '#383d41' %}
+          {% set stance_short = 'ACCUM' if a.lt_stance == 'ACCUMULATE' else a.lt_stance %}
           <tr style="border-bottom:1px solid #f5f5f5;">
-            <td style="padding:8px 10px;font-weight:700;">{{ a.symbol }}</td>
-            <td style="padding:8px 10px;text-align:right;">${{ "%.2f"|format(a.price) }}</td>
-            <td style="padding:8px 10px;text-align:center;">
-              <span style="color:{{ trend_color }};font-weight:700;font-size:11px;">{{ a.trend }}</span>
+            <td class="sym" style="padding:8px 8px;font-weight:700;font-size:12px;">{{ a.symbol }}</td>
+            <td style="padding:8px 6px;text-align:right;white-space:nowrap;">${{ "%.2f"|format(a.price) }}</td>
+            <td style="padding:8px 6px;text-align:center;">
+              <span style="color:{{ trend_color }};font-weight:700;font-size:11px;">{{ trend_short }}</span>
             </td>
-            <td style="padding:8px 10px;text-align:center;">
+            <td style="padding:8px 6px;text-align:center;">
               {{ "%.0f"|format(a.technical.rsi) if a.technical and a.technical.rsi else '—' }}
             </td>
-            <td style="padding:8px 10px;text-align:right;color:#888;">
-              {{ '$' ~ "%.2f"|format(a.technical.support) if a.technical and a.technical.support else '—' }}
-            </td>
-            <td style="padding:8px 10px;text-align:right;color:#888;">
-              {{ '$' ~ "%.2f"|format(a.technical.resistance) if a.technical and a.technical.resistance else '—' }}
-            </td>
-            <td style="padding:8px 10px;text-align:center;">
-              <span style="background:{{ stance_bg }};color:{{ stance_color }};padding:2px 8px;
-                           border-radius:10px;font-size:10px;font-weight:700;">
-                {{ a.lt_stance }}
+            <td style="padding:8px 6px;text-align:center;">
+              <span style="background:{{ stance_bg }};color:{{ stance_color }};padding:2px 6px;
+                           border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;">
+                {{ stance_short }}
               </span>
             </td>
           </tr>
