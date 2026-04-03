@@ -1,0 +1,407 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" />
+      <mj-text font-size="14px" line-height="1.6" color="#1a1a2e" />
+      <mj-section padding="0" />
+    </mj-attributes>
+    <mj-style>
+      .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+      .value { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+      .pill { display: inline-block; padding: 2px 10px; border-radius: 20px;
+              font-size: 11px; font-weight: 700; }
+      .trend-bull { color: #2ecc71; font-weight: 700; }
+      .trend-bear { color: #e74c3c; font-weight: 700; }
+      .trend-side { color: #f39c12; font-weight: 700; }
+    </mj-style>
+  </mj-head>
+
+  <mj-body background-color="#f0f2f5">
+
+    <!-- ═══════════════════════════════════════════ HEADER -->
+    <mj-section background-color="#1a1a2e" border-radius="10px 10px 0 0" padding="20px 24px">
+      <mj-column>
+        <mj-text color="#ffffff" font-size="20px" font-weight="700" letter-spacing="0.5px" padding="0">
+          Stock Alert System
+        </mj-text>
+        <mj-text color="#a0a8c0" font-size="12px" padding="4px 0 0 0">
+          Morning Briefing &nbsp;|&nbsp; {{ pulse.date }}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- ═══════════════════════════════════════════ MARKET PULSE -->
+    <mj-section background-color="#ffffff" padding="16px 24px 0 24px">
+      <mj-column>
+        <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
+                 letter-spacing="1px" color="#888" padding="0 0 10px 0">
+          Market Pulse
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#ffffff" padding="0 24px">
+      <mj-column width="25%">
+        <mj-text align="center" padding="8px 4px">
+          <span style="font-size:24px;font-weight:700;color:#2ecc71;">{{ pulse.bullish_count }}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;">Bullish</span>
+        </mj-text>
+      </mj-column>
+      <mj-column width="25%">
+        <mj-text align="center" padding="8px 4px">
+          <span style="font-size:24px;font-weight:700;color:#f39c12;">{{ pulse.neutral_count }}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;">Neutral</span>
+        </mj-text>
+      </mj-column>
+      <mj-column width="25%">
+        <mj-text align="center" padding="8px 4px">
+          <span style="font-size:24px;font-weight:700;color:#e74c3c;">{{ pulse.bearish_count }}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;">Bearish</span>
+        </mj-text>
+      </mj-column>
+      <mj-column width="25%">
+        <mj-text align="center" padding="8px 4px">
+          <span style="font-size:24px;font-weight:700;color:#1a1a2e;">{{ pulse.total }}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;">Watched</span>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#ffffff" padding="8px 24px 16px 24px">
+      <mj-column>
+        <mj-text padding="0">
+          <span style="display:inline-block;padding:4px 14px;border-radius:20px;
+                font-size:12px;font-weight:700;color:#fff;background:{{ pulse.risk_color }};">
+            {{ pulse.risk_environment }}
+          </span>
+        </mj-text>
+        <mj-text padding="10px 0 0 0" font-size="13px" color="#444"
+                 background-color="#f8f9fa" border-left="3px solid #1a1a2e">
+          <span style="padding: 0 12px;">{{ pulse.verdict }}</span>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#f0f2f5" padding="6px 0" />
+
+    <!-- ═══════════════════════════════════════════ TOP ETF SIGNALS -->
+    <mj-section background-color="#ffffff" padding="16px 24px 4px 24px">
+      <mj-column>
+        <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
+                 letter-spacing="1px" color="#888" padding="0 0 4px 0"
+                 border-bottom="1px solid #f0f0f0">
+          Top ETF Signals
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {% for a in top_etfs %}
+    {% set top_alert = a.alerts | sort(attribute='confidence_score', reverse=True) | first if a.alerts else none %}
+    {% set action = top_alert.action if top_alert else 'HOLD' %}
+    {% set action_color = get_action_color(action) %}
+    {% set rr = compute_rr(top_alert.entry_zone, top_alert.exit_target, top_alert.stop_loss) if top_alert else none %}
+
+    <!-- Card: {{ a.symbol }} -->
+    <mj-section background-color="#ffffff" padding="8px 24px">
+      <mj-column border="1px solid #e8eaf0" border-radius="8px" padding="0">
+
+        <!-- Card Header -->
+        <mj-text background-color="#fafafa" padding="12px 16px" border-radius="8px 8px 0 0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <span style="font-size:18px;font-weight:700;color:#1a1a2e;">{{ a.symbol }}</span><br>
+                <span style="font-size:11px;color:#888;">
+                  {{ a.fundamentals.get('name', a.symbol) if a.fundamentals else a.symbol }}
+                </span>
+              </td>
+              <td align="right">
+                <span style="font-size:18px;font-weight:700;color:#1a1a2e;">${{ "%.2f"|format(a.price) }}</span><br>
+                <span style="font-size:11px;color:#888;">{{ a.asset_type }}</span>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+        <!-- Action Bar -->
+        <mj-text background-color="{{ action_color }}" padding="10px 16px">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <span style="font-size:14px;font-weight:700;color:#fff;letter-spacing:0.5px;">
+                  {{ action }}
+                </span>
+              </td>
+              <td align="right">
+                <span style="font-size:11px;color:rgba(255,255,255,0.9);">
+                  Confidence &nbsp;
+                  <span style="display:inline-block;width:60px;height:5px;background:rgba(255,255,255,0.3);border-radius:3px;vertical-align:middle;">
+                    <span style="display:block;width:{{ a.confidence_score * 10 }}%;height:5px;background:#fff;border-radius:3px;"></span>
+                  </span>
+                  &nbsp;{{ a.confidence_score }}/10
+                </span>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+        {% if top_alert %}
+        <!-- Verdict -->
+        <mj-text background-color="#fafafa" padding="10px 16px" font-size="13px"
+                 color="#555" font-style="italic" border-top="1px solid #f0f0f0">
+          {{ top_alert.condition }}
+        </mj-text>
+
+        <!-- Levels -->
+        <mj-text padding="0 0 0 0" border-top="1px solid #f0f0f0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="25%" align="center" style="padding:10px 4px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Entry</div>
+                <div style="font-size:12px;font-weight:600;">{{ top_alert.entry_zone or '—' }}</div>
+              </td>
+              <td width="25%" align="center" style="padding:10px 4px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Target</div>
+                <div style="font-size:12px;font-weight:600;">{{ top_alert.exit_target or '—' }}</div>
+              </td>
+              <td width="25%" align="center" style="padding:10px 4px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Stop Loss</div>
+                <div style="font-size:12px;font-weight:600;">{{ top_alert.stop_loss or '—' }}</div>
+              </td>
+              <td width="25%" align="center" style="padding:10px 4px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">R / R</div>
+                <div style="font-size:12px;font-weight:600;">{{ rr or '—' }}</div>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+        {% endif %}
+
+        <!-- Time Horizons -->
+        <mj-text padding="0" border-top="1px solid #f0f0f0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="33%" style="padding:8px 10px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Short-Term</div>
+                <div style="font-size:12px;font-weight:600;">{{ a.st_direction }}</div>
+              </td>
+              <td width="33%" style="padding:8px 10px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Mid-Term</div>
+                <div style="font-size:12px;font-weight:600;">
+                  {{ a.mt_expected_outcome[:45] ~ '…' if a.mt_expected_outcome|length > 45 else a.mt_expected_outcome }}
+                </div>
+              </td>
+              <td width="33%" style="padding:8px 10px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Long-Term</div>
+                <div style="font-size:12px;font-weight:600;">{{ a.lt_stance }}</div>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+      </mj-column>
+    </mj-section>
+    {% else %}
+    <mj-section background-color="#ffffff" padding="8px 24px 16px">
+      <mj-column>
+        <mj-text color="#999" font-style="italic" font-size="13px" padding="0">
+          No ETF signals today.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    {% endfor %}
+
+    <mj-section background-color="#f0f2f5" padding="6px 0" />
+
+    <!-- ═══════════════════════════════════════════ TOP STOCK SIGNALS -->
+    <mj-section background-color="#ffffff" padding="16px 24px 4px 24px">
+      <mj-column>
+        <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
+                 letter-spacing="1px" color="#888" padding="0 0 4px 0"
+                 border-bottom="1px solid #f0f0f0">
+          Top Stock Signals
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {% for a in top_stocks %}
+    {% set top_alert = a.alerts | sort(attribute='confidence_score', reverse=True) | first if a.alerts else none %}
+    {% set action = top_alert.action if top_alert else 'HOLD' %}
+    {% set action_color = get_action_color(action) %}
+    {% set rr = compute_rr(top_alert.entry_zone, top_alert.exit_target, top_alert.stop_loss) if top_alert else none %}
+
+    <!-- Card: {{ a.symbol }} -->
+    <mj-section background-color="#ffffff" padding="8px 24px">
+      <mj-column border="1px solid #e8eaf0" border-radius="8px" padding="0">
+
+        <mj-text background-color="#fafafa" padding="12px 16px" border-radius="8px 8px 0 0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <span style="font-size:18px;font-weight:700;color:#1a1a2e;">{{ a.symbol }}</span><br>
+                <span style="font-size:11px;color:#888;">
+                  {{ a.fundamentals.get('name', a.symbol) if a.fundamentals else a.symbol }}
+                </span>
+              </td>
+              <td align="right">
+                <span style="font-size:18px;font-weight:700;color:#1a1a2e;">${{ "%.2f"|format(a.price) }}</span><br>
+                <span style="font-size:11px;color:#888;">
+                  {{ a.fundamentals.get('sector', 'Stock') if a.fundamentals else 'Stock' }}
+                </span>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+        <mj-text background-color="{{ action_color }}" padding="10px 16px">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <span style="font-size:14px;font-weight:700;color:#fff;letter-spacing:0.5px;">
+                  {{ action }}
+                </span>
+              </td>
+              <td align="right">
+                <span style="font-size:11px;color:rgba(255,255,255,0.9);">
+                  Confidence &nbsp;
+                  <span style="display:inline-block;width:60px;height:5px;background:rgba(255,255,255,0.3);border-radius:3px;vertical-align:middle;">
+                    <span style="display:block;width:{{ a.confidence_score * 10 }}%;height:5px;background:#fff;border-radius:3px;"></span>
+                  </span>
+                  &nbsp;{{ a.confidence_score }}/10
+                </span>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+        {% if top_alert %}
+        <mj-text background-color="#fafafa" padding="10px 16px" font-size="13px"
+                 color="#555" font-style="italic" border-top="1px solid #f0f0f0">
+          {{ top_alert.condition }}
+        </mj-text>
+
+        <mj-text padding="0" border-top="1px solid #f0f0f0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="25%" align="center" style="padding:10px 4px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Entry</div>
+                <div style="font-size:12px;font-weight:600;">{{ top_alert.entry_zone or '—' }}</div>
+              </td>
+              <td width="25%" align="center" style="padding:10px 4px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Target</div>
+                <div style="font-size:12px;font-weight:600;">{{ top_alert.exit_target or '—' }}</div>
+              </td>
+              <td width="25%" align="center" style="padding:10px 4px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Stop Loss</div>
+                <div style="font-size:12px;font-weight:600;">{{ top_alert.stop_loss or '—' }}</div>
+              </td>
+              <td width="25%" align="center" style="padding:10px 4px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">R / R</div>
+                <div style="font-size:12px;font-weight:600;">{{ rr or '—' }}</div>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+        {% endif %}
+
+        <mj-text padding="0" border-top="1px solid #f0f0f0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="33%" style="padding:8px 10px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Short-Term</div>
+                <div style="font-size:12px;font-weight:600;">{{ a.st_direction }}</div>
+              </td>
+              <td width="33%" style="padding:8px 10px;border-right:1px solid #f0f0f0;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Mid-Term</div>
+                <div style="font-size:12px;font-weight:600;">
+                  {{ a.mt_expected_outcome[:45] ~ '…' if a.mt_expected_outcome|length > 45 else a.mt_expected_outcome }}
+                </div>
+              </td>
+              <td width="33%" style="padding:8px 10px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:3px;">Long-Term</div>
+                <div style="font-size:12px;font-weight:600;">{{ a.lt_stance }}</div>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+      </mj-column>
+    </mj-section>
+    {% else %}
+    <mj-section background-color="#ffffff" padding="8px 24px 16px">
+      <mj-column>
+        <mj-text color="#999" font-style="italic" font-size="13px" padding="0">
+          No stock signals today.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    {% endfor %}
+
+    <mj-section background-color="#f0f2f5" padding="6px 0" />
+
+    <!-- ═══════════════════════════════════════════ FULL WATCHLIST TABLE -->
+    <mj-section background-color="#ffffff" padding="16px 24px 4px 24px">
+      <mj-column>
+        <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
+                 letter-spacing="1px" color="#888" padding="0 0 12px 0"
+                 border-bottom="1px solid #f0f0f0">
+          Full Watchlist Snapshot
+        </mj-text>
+        <mj-table font-size="12px" color="#1a1a2e" padding="0">
+          <tr style="background:#f0f2f5;">
+            <th style="padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Symbol</th>
+            <th style="padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Price</th>
+            <th style="padding:8px 10px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Trend</th>
+            <th style="padding:8px 10px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">RSI</th>
+            <th style="padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Support</th>
+            <th style="padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Resist.</th>
+            <th style="padding:8px 10px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#666;">Stance</th>
+          </tr>
+          {% for a in all_analyses %}
+          {% set trend_color = '#2ecc71' if a.trend == 'BULLISH' else '#e74c3c' if a.trend == 'BEARISH' else '#f39c12' %}
+          {% set stance_bg = '#d4edda' if a.lt_stance == 'ACCUMULATE' else '#f8d7da' if a.lt_stance == 'AVOID' else '#e2e3e5' %}
+          {% set stance_color = '#1a7a4a' if a.lt_stance == 'ACCUMULATE' else '#721c24' if a.lt_stance == 'AVOID' else '#383d41' %}
+          <tr style="border-bottom:1px solid #f5f5f5;">
+            <td style="padding:8px 10px;font-weight:700;">{{ a.symbol }}</td>
+            <td style="padding:8px 10px;text-align:right;">${{ "%.2f"|format(a.price) }}</td>
+            <td style="padding:8px 10px;text-align:center;">
+              <span style="color:{{ trend_color }};font-weight:700;font-size:11px;">{{ a.trend }}</span>
+            </td>
+            <td style="padding:8px 10px;text-align:center;">
+              {{ "%.0f"|format(a.technical.rsi) if a.technical and a.technical.rsi else '—' }}
+            </td>
+            <td style="padding:8px 10px;text-align:right;color:#888;">
+              {{ '$' ~ "%.2f"|format(a.technical.support) if a.technical and a.technical.support else '—' }}
+            </td>
+            <td style="padding:8px 10px;text-align:right;color:#888;">
+              {{ '$' ~ "%.2f"|format(a.technical.resistance) if a.technical and a.technical.resistance else '—' }}
+            </td>
+            <td style="padding:8px 10px;text-align:center;">
+              <span style="background:{{ stance_bg }};color:{{ stance_color }};padding:2px 8px;
+                           border-radius:10px;font-size:10px;font-weight:700;">
+                {{ a.lt_stance }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </mj-table>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#f0f2f5" padding="6px 0" />
+
+    <!-- ═══════════════════════════════════════════ FOOTER -->
+    <mj-section background-color="#ffffff" border-radius="0 0 10px 10px" padding="16px 24px">
+      <mj-column>
+        <mj-text font-size="11px" color="#aaa" line-height="1.7" padding="0">
+          Stock Alert System &nbsp;|&nbsp; Data: Yahoo Finance &nbsp;|&nbsp;
+          {{ all_analyses | length }} symbols monitored<br>
+          <strong>Disclaimer:</strong> This is not financial advice. All signals are algorithmic
+          and for informational purposes only. Always do your own research before making
+          investment decisions.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+  </mj-body>
+</mjml>

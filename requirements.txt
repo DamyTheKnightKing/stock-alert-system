@@ -18,6 +18,7 @@ requests>=2.31.0
 # Notifications
 resend>=2.0.0
 jinja2>=3.1.0
+mjml>=0.12.0
 
 # CLI output
 tabulate>=0.9.0

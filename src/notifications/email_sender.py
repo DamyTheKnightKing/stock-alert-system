@@ -1,14 +1,21 @@
 """
-Email Notification Layer — Resend (resend.com).
-Free tier: 3,000 emails/month.
+Email Notification Layer — Resend + MJML.
+
+Pipeline:
+  1. Load .mjml template (Jinja2 syntax embedded)
+  2. Render Jinja2 → valid MJML string
+  3. Compile MJML → bulletproof responsive HTML (table-based, works in Gmail/mobile)
+  4. Send via Resend API
 
 Strategy:
-  - Morning digest (8:30 AM ET daily): top 3 ETFs + top 3 stocks + full watchlist table
-  - Intraday alert: only when confidence >= 8/10, max once per day
+  - Morning digest (8:30 AM ET daily): top 3 ETFs + top 3 stocks + watchlist table
+  - Intraday alert: only confidence >= 8/10, max once per day
 """
 import logging
 import os
+from pathlib import Path
 
+import mjml
 import resend
 from jinja2 import Template
 
@@ -17,14 +24,27 @@ from src.analysis.signals import Alert
 
 logger = logging.getLogger(__name__)
 
+TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
+
+
+def _render(template_file: str, **context) -> str:
+    """Jinja2 render → MJML compile → HTML."""
+    raw = (TEMPLATES_DIR / template_file).read_text()
+    mjml_str = Template(raw).render(**context)
+    result = mjml.mjml_to_html(mjml_str)
+    if result.errors:
+        for err in result.errors:
+            logger.warning(f"MJML warning: {err}")
+    return result.html
+
 FROM_EMAIL = "Stock Alerts <onboarding@resend.dev>"
 
 
 # ---------------------------------------------------------------------------
-# Morning Digest Template
+# Legacy inline templates — kept only as fallback reference, not used
 # ---------------------------------------------------------------------------
 
-MORNING_DIGEST_HTML = """
+_MORNING_DIGEST_HTML_LEGACY = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -452,7 +472,8 @@ def send_morning_digest(digest: MorningDigest, report_date: str = None) -> bool:
         f"{bull} Bullish / {bear} Bearish | {digest.pulse.risk_environment}"
     )
 
-    html = Template(MORNING_DIGEST_HTML).render(
+    html = _render(
+        "morning_digest.mjml",
         pulse=digest.pulse,
         top_etfs=digest.top_etfs,
         top_stocks=digest.top_stocks,
@@ -482,7 +503,8 @@ def send_intraday_alerts(alerts: list[Alert]) -> bool:
     now = datetime.now().strftime("%H:%M ET")
     subject = f"[StockAlert] INTRADAY — {len(high_conf)} high-confidence alert(s)"
 
-    html = Template(INTRADAY_HTML).render(
+    html = _render(
+        "intraday_alert.mjml",
         alerts=high_conf,
         alert_count=len(high_conf),
         now=now,
