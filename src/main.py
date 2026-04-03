@@ -33,35 +33,38 @@ os.makedirs("logs", exist_ok=True)
 os.makedirs("data", exist_ok=True)
 
 
-def cmd_daily():
-    """Full daily pipeline: analyze all watchlist symbols + send email."""
-    from src.alerts.engine import run_daily_analysis
-    from src.notifications.email_sender import send_daily_report
-    from src.storage.db import get_pending_alerts, init_db, mark_alerts_notified, purge_old_records
+def cmd_daily(all_users: bool = False):
+    """Full daily pipeline."""
+    from src.storage.db import init_db, purge_old_records
 
     logger.info("=== DAILY ANALYSIS START ===")
     init_db()
 
-    analyses = run_daily_analysis()
+    if all_users:
+        # Multi-user mode: read from DB, send personalised email per user
+        from src.alerts.engine import run_for_all_users
+        count = run_for_all_users()
+        logger.info(f"Multi-user run complete: {count} users processed")
+    else:
+        # Single-user mode: use watchlist.yml (personal/admin use)
+        from src.alerts.engine import run_daily_analysis
+        from src.notifications.email_sender import send_daily_report
+        from src.storage.db import get_pending_alerts, mark_alerts_notified
 
-    if not analyses:
-        logger.warning("No analyses generated — check watchlist and data connectivity")
-        return
+        analyses = run_daily_analysis()
+        if not analyses:
+            logger.warning("No analyses generated — check watchlist and data connectivity")
+            return
 
-    # Print console summary
-    _print_console_report(analyses)
+        _print_console_report(analyses)
+        today = datetime.now().strftime("%Y-%m-%d")
+        success = send_daily_report(analyses, report_date=today)
 
-    # Send email report
-    today = datetime.now().strftime("%Y-%m-%d")
-    success = send_daily_report(analyses, report_date=today)
+        if success:
+            pending = get_pending_alerts()
+            if pending:
+                mark_alerts_notified([a["id"] for a in pending])
 
-    if success:
-        # Mark alerts as notified
-        pending = get_pending_alerts()
-        if pending:
-            mark_alerts_notified([a["id"] for a in pending])
-
-    # Housekeeping
     purge_old_records(retention_days=90)
     logger.info("=== DAILY ANALYSIS COMPLETE ===")
 
@@ -197,7 +200,9 @@ def main():
     parser = argparse.ArgumentParser(description="Stock Alert System")
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser("daily", help="Run full daily analysis + email report")
+    daily_parser = subparsers.add_parser("daily", help="Run full daily analysis + email report")
+    daily_parser.add_argument("--all-users", action="store_true",
+                              help="Run for all DB users (multi-user mode)")
     subparsers.add_parser("intraday", help="Run intraday signal check")
 
     analyze_parser = subparsers.add_parser("analyze", help="Analyze specific symbols")
@@ -206,7 +211,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "daily":
-        cmd_daily()
+        cmd_daily(all_users=getattr(args, "all_users", False))
     elif args.command == "intraday":
         cmd_intraday()
     elif args.command == "analyze":

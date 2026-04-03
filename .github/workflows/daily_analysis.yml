@@ -27,13 +27,13 @@ jobs:
       - name: Create required directories
         run: mkdir -p data logs
 
-      - name: Run daily analysis
+      - name: Run daily analysis (all users)
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           LOG_LEVEL: INFO
-        run: python -m src.main daily
+        run: python -m src.main daily --all-users
 
       - name: Upload logs as artifact
         if: always()

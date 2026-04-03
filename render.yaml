@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: stock-alert-api
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false        # set manually in Render dashboard
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_RECIPIENTS
+        sync: false
+      - key: API_SECRET_KEY
+        sync: false        # random secret for internal calls
+      - key: ALLOWED_ORIGIN
+        value: https://damytheknightking.github.io

@@ -66,6 +66,17 @@ def _db():
 # --- Schema ---
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    email               TEXT NOT NULL UNIQUE,
+    watchlist           TEXT NOT NULL,
+    schedule            TEXT DEFAULT 'morning',
+    active              INTEGER DEFAULT 1,
+    unsubscribe_token   TEXT NOT NULL,
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS price_snapshots (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol       TEXT NOT NULL,
@@ -196,7 +207,7 @@ def save_analysis_report(data: dict):
 def get_pending_alerts() -> list[dict]:
     with _db() as conn:
         cur = conn.execute("SELECT * FROM alerts WHERE notified = 0")
-        return [dict(row) for row in cur.fetchall()]
+        return _rows_to_dicts(cur)
 
 
 def mark_alerts_notified(alert_ids: list[int]):
@@ -217,7 +228,7 @@ def get_recent_snapshots(symbol: str, days: int = 7) -> list[dict]:
             "SELECT * FROM price_snapshots WHERE symbol = ? AND date >= ? ORDER BY date DESC",
             (symbol, cutoff)
         )
-        return [dict(row) for row in cur.fetchall()]
+        return _rows_to_dicts(cur)
 
 
 def purge_old_records(retention_days: int = 90):
@@ -229,6 +240,19 @@ def purge_old_records(retention_days: int = 90):
     logger.info(f"Purged: {r1} alerts, {r2} snapshots, {r3} reports")
 
 
+def _rows_to_dicts(cursor) -> list[dict]:
+    """Convert raw cursor rows (tuples or Row objects) to dicts using column names."""
+    cols = [d[0] for d in cursor.description]
+    return [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+
+def _row_to_dict(cursor, row) -> dict | None:
+    if row is None:
+        return None
+    cols = [d[0] for d in cursor.description]
+    return dict(zip(cols, row))
+
+
 def _coerce(data: dict) -> dict:
     """Convert datetime objects to ISO strings for storage."""
     out = {}
@@ -238,3 +262,55 @@ def _coerce(data: dict) -> dict:
         else:
             out[k] = v
     return out
+
+
+# ---------------------------------------------------------------------------
+# User management
+# ---------------------------------------------------------------------------
+
+def save_user(data: dict):
+    """Insert or update a user subscription (upsert on email)."""
+    with _db() as conn:
+        conn.execute("""
+            INSERT INTO users (email, watchlist, schedule, active, unsubscribe_token)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET
+                watchlist           = excluded.watchlist,
+                schedule            = excluded.schedule,
+                active              = 1,
+                updated_at          = datetime('now')
+        """, (
+            data["email"], data["watchlist"],
+            data.get("schedule", "morning"),
+            data.get("active", 1),
+            data["unsubscribe_token"],
+        ))
+    logger.info(f"User saved: {data['email']}")
+
+
+def get_active_users() -> list[dict]:
+    """Fetch all active subscribers."""
+    with _db() as conn:
+        cur = conn.execute(
+            "SELECT * FROM users WHERE active = 1 ORDER BY created_at ASC"
+        )
+        return _rows_to_dicts(cur)
+
+
+def get_user_by_token(token: str) -> dict | None:
+    """Look up user by unsubscribe token."""
+    with _db() as conn:
+        cur = conn.execute(
+            "SELECT * FROM users WHERE unsubscribe_token = ?", (token,)
+        )
+        return _row_to_dict(cur, cur.fetchone())
+
+
+def unsubscribe_user(token: str):
+    """Mark user as inactive via unsubscribe token."""
+    with _db() as conn:
+        conn.execute(
+            "UPDATE users SET active = 0, updated_at = datetime('now') WHERE unsubscribe_token = ?",
+            (token,)
+        )
+    logger.info(f"User unsubscribed via token: {token[:8]}...")

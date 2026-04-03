@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Alert System — Subscribe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #1a1a2e;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 520px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: #1a1a2e;
+      padding: 24px 28px;
+    }
+    .card-header h1 { color: #fff; font-size: 20px; font-weight: 700; }
+    .card-header p  { color: #a0a8c0; font-size: 13px; margin-top: 4px; }
+
+    .card-body { padding: 28px; }
+
+    .form-group { margin-bottom: 20px; }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    input[type="email"] {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1a1a2e;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="email"]:focus { border-color: #1a1a2e; }
+
+    /* Symbol search */
+    .search-wrap { position: relative; }
+    .search-input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1a1a2e;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: #1a1a2e; }
+
+    .dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: #fff;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+      z-index: 100;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .dropdown.show { display: block; }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background 0.1s;
+    }
+    .dropdown-item:last-child { border-bottom: none; }
+    .dropdown-item:hover { background: #f8f9fa; }
+    .dropdown-item.disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .item-left { display: flex; flex-direction: column; }
+    .item-symbol { font-weight: 700; font-size: 14px; }
+    .item-name   { font-size: 11px; color: #888; margin-top: 1px; }
+    .item-badge  {
+      font-size: 10px; font-weight: 700; padding: 2px 7px;
+      border-radius: 10px; background: #e8f4fd; color: #1a6fa8;
+    }
+    .item-badge.etf { background: #e8f5e9; color: #2e7d32; }
+
+    /* Selected chips */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 36px;
+      padding: 6px 0 2px;
+    }
+    .chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1a1a2e;
+      color: #fff;
+      border-radius: 20px;
+      padding: 4px 10px 4px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .chip-remove {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 50%;
+      width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 11px;
+      color: #fff;
+      line-height: 1;
+      padding: 0;
+    }
+    .chip-remove:hover { background: rgba(255,255,255,0.35); }
+
+    .chips-hint {
+      font-size: 11px;
+      color: #bbb;
+      margin-top: 4px;
+    }
+
+    /* Schedule */
+    .schedule-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .schedule-option input[type="radio"] { display: none; }
+    .schedule-option label {
+      display: block;
+      text-align: center;
+      padding: 10px 8px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #555;
+    }
+    .schedule-option input[type="radio"]:checked + label {
+      border-color: #1a1a2e;
+      background: #1a1a2e;
+      color: #fff;
+    }
+    .schedule-time {
+      font-size: 10px;
+      font-weight: 400;
+      display: block;
+      margin-top: 2px;
+      opacity: 0.75;
+    }
+
+    /* Submit */
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: #1a1a2e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      letter-spacing: 0.3px;
+    }
+    .btn-submit:hover { opacity: 0.88; }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Status messages */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .alert.success { background: #d4edda; color: #1a7a4a; border: 1px solid #b8dfc9; }
+    .alert.error   { background: #f8d7da; color: #721c24; border: 1px solid #f1aeb5; }
+    .alert.show    { display: block; }
+
+    /* Loading spinner */
+    .spinner {
+      display: none;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .card-footer {
+      padding: 16px 28px;
+      background: #f8f9fa;
+      border-top: 1px solid #eee;
+      font-size: 11px;
+      color: #aaa;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 480px) {
+      .schedule-options { grid-template-columns: 1fr; }
+      .card-body { padding: 20px; }
+      .card-header { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-header">
+    <h1>Stock Alert System</h1>
+    <p>Get personalised daily market briefings — free</p>
+  </div>
+
+  <div class="card-body">
+    <div class="alert" id="alert"></div>
+
+    <form id="subscribeForm" novalidate>
+
+      <!-- Email -->
+      <div class="form-group">
+        <label for="email">Your Email</label>
+        <input type="email" id="email" placeholder="you@gmail.com" required autocomplete="email">
+      </div>
+
+      <!-- Symbol Search -->
+      <div class="form-group">
+        <label>Stock Symbols <span style="color:#bbb;font-weight:400;text-transform:none;letter-spacing:0">(up to 10)</span></label>
+        <div class="search-wrap">
+          <input type="text" class="search-input" id="symbolSearch"
+                 placeholder="Type ticker or company name (e.g. AAPL, Tesla...)"
+                 autocomplete="off">
+          <div class="dropdown" id="dropdown"></div>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div class="chips-hint" id="chipsHint">No symbols selected yet</div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="form-group">
+        <label>Alert Schedule</label>
+        <div class="schedule-options">
+          <div class="schedule-option">
+            <input type="radio" name="schedule" id="sch_morning" value="morning" checked>
+            <label for="sch_morning">
+              Morning
+              <span class="schedule-time">8:30 AM ET</span>
+            </label>
+          </div>
+          <div class="schedule-option">
+            <input type="radio" name="schedule" id="sch_evening" value="evening">
+            <label for="sch_evening">
+              Evening
+              <span class="schedule-time">4:30 PM ET</span>
+            </label>
+          </div>
+          <div class="schedule-option">
+            <input type="radio" name="schedule" id="sch_both" value="both">
+            <label for="sch_both">
+              Both
+              <span class="schedule-time">Twice daily</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">
+        <span class="spinner" id="spinner"></span>
+        <span id="submitText">Subscribe — It's Free</span>
+      </button>
+
+    </form>
+  </div>
+
+  <div class="card-footer">
+    Professional broker-style alerts · ETF-first strategy · No spam<br>
+    Unsubscribe anytime · Not financial advice
+  </div>
+</div>
+
+<script>
+  // ─── CONFIG ───────────────────────────────────────────────────────────────
+  // After deploying to Render, replace this with your actual API URL
+  const API_BASE = 'https://stock-alert-api.onrender.com';
+
+  // ─── STATE ────────────────────────────────────────────────────────────────
+  const selectedSymbols = [];
+  const MAX_SYMBOLS = 10;
+  let searchTimer = null;
+
+  // ─── ELEMENTS ─────────────────────────────────────────────────────────────
+  const searchInput  = document.getElementById('symbolSearch');
+  const dropdown     = document.getElementById('dropdown');
+  const chipsEl      = document.getElementById('chips');
+  const chipsHint    = document.getElementById('chipsHint');
+  const form         = document.getElementById('subscribeForm');
+  const alertEl      = document.getElementById('alert');
+  const submitBtn    = document.getElementById('submitBtn');
+  const spinner      = document.getElementById('spinner');
+  const submitText   = document.getElementById('submitText');
+
+  // ─── SYMBOL SEARCH ────────────────────────────────────────────────────────
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    clearTimeout(searchTimer);
+    if (q.length < 1) { hideDropdown(); return; }
+    searchTimer = setTimeout(() => fetchSymbols(q), 250);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideDropdown();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrap')) hideDropdown();
+  });
+
+  async function fetchSymbols(q) {
+    try {
+      const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return;
+      const results = await res.json();
+      renderDropdown(results);
+    } catch {
+      // API not reachable — show nothing
+      hideDropdown();
+    }
+  }
+
+  function renderDropdown(results) {
+    if (!results.length) { hideDropdown(); return; }
+    dropdown.innerHTML = results.map(r => {
+      const already = selectedSymbols.includes(r.symbol);
+      const isEtf   = r.type === 'ETF';
+      return `
+        <div class="dropdown-item ${already ? 'disabled' : ''}"
+             data-symbol="${r.symbol}" data-name="${r.name}" data-type="${r.type}">
+          <div class="item-left">
+            <span class="item-symbol">${r.symbol}</span>
+            <span class="item-name">${r.name}</span>
+          </div>
+          <span class="item-badge ${isEtf ? 'etf' : ''}">${isEtf ? 'ETF' : 'Stock'}</span>
+        </div>`;
+    }).join('');
+
+    dropdown.querySelectorAll('.dropdown-item:not(.disabled)').forEach(el => {
+      el.addEventListener('click', () => {
+        addSymbol(el.dataset.symbol, el.dataset.name);
+        searchInput.value = '';
+        hideDropdown();
+        searchInput.focus();
+      });
+    });
+
+    dropdown.classList.add('show');
+  }
+
+  function hideDropdown() {
+    dropdown.classList.remove('show');
+    dropdown.innerHTML = '';
+  }
+
+  function addSymbol(symbol, name) {
+    if (selectedSymbols.includes(symbol)) return;
+    if (selectedSymbols.length >= MAX_SYMBOLS) {
+      showAlert(`Maximum ${MAX_SYMBOLS} symbols allowed`, 'error');
+      return;
+    }
+    selectedSymbols.push(symbol);
+    renderChips();
+  }
+
+  function removeSymbol(symbol) {
+    const idx = selectedSymbols.indexOf(symbol);
+    if (idx > -1) selectedSymbols.splice(idx, 1);
+    renderChips();
+  }
+
+  function renderChips() {
+    if (selectedSymbols.length === 0) {
+      chipsEl.innerHTML = '';
+      chipsHint.textContent = 'No symbols selected yet';
+      return;
+    }
+    chipsHint.textContent = `${selectedSymbols.length} of ${MAX_SYMBOLS} symbols selected`;
+    chipsEl.innerHTML = selectedSymbols.map(sym => `
+      <div class="chip">
+        <span>${sym}</span>
+        <button class="chip-remove" onclick="removeSymbol('${sym}')" type="button">✕</button>
+      </div>
+    `).join('');
+  }
+
+  // ─── FORM SUBMIT ──────────────────────────────────────────────────────────
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideAlert();
+
+    const email    = document.getElementById('email').value.trim();
+    const schedule = document.querySelector('input[name="schedule"]:checked').value;
+
+    if (!email) { showAlert('Please enter your email address.', 'error'); return; }
+    if (selectedSymbols.length === 0) { showAlert('Please select at least one symbol.', 'error'); return; }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, symbols: selectedSymbols, schedule }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        showAlert(
+          `You're subscribed! Check your inbox for a confirmation email.<br>
+           Watching: <strong>${selectedSymbols.join(', ')}</strong>`,
+          'success'
+        );
+        form.reset();
+        selectedSymbols.length = 0;
+        renderChips();
+      } else {
+        showAlert(data.detail || 'Something went wrong. Please try again.', 'error');
+      }
+    } catch {
+      showAlert('Cannot reach the server. Please try again later.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  // ─── UI HELPERS ───────────────────────────────────────────────────────────
+  function showAlert(msg, type) {
+    alertEl.innerHTML = msg;
+    alertEl.className = `alert ${type} show`;
+    alertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideAlert() {
+    alertEl.className = 'alert';
+  }
+
+  function setLoading(on) {
+    submitBtn.disabled = on;
+    spinner.style.display = on ? 'inline-block' : 'none';
+    submitText.textContent = on ? 'Subscribing…' : 'Subscribe — It\'s Free';
+  }
+</script>
+
+</body>
+</html>

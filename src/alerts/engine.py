@@ -88,6 +88,92 @@ def run_daily_analysis(watchlist_path: str = "config/watchlist.yml",
     return results
 
 
+def run_for_all_users() -> int:
+    """
+    Multi-user pipeline.
+    1. Load all active users from DB
+    2. Collect all unique symbols across ALL users (fetch once, serve many)
+    3. Run analysis per unique symbol
+    4. For each user, build their personalised digest and send email
+    Returns number of users processed.
+    """
+    import json as _json
+    import os as _os
+    import resend as _resend
+    from src.storage.db import get_active_users
+    from src.notifications.email_sender import send_morning_digest
+    from src.alerts.digest import build_digest
+
+    settings = load_settings()
+    tech_cfg = settings.get("technical", {})
+    alert_cfg = settings.get("alerts", {})
+
+    users = get_active_users()
+    if not users:
+        logger.info("No active users found")
+        return 0
+
+    logger.info(f"Running analysis for {len(users)} users")
+
+    # --- Step 1: collect all unique symbols across all users ---
+    all_symbols: set[str] = set()
+    for user in users:
+        try:
+            symbols = _json.loads(user["watchlist"])
+            all_symbols.update(symbols)
+        except Exception:
+            pass
+
+    logger.info(f"Unique symbols across all users: {len(all_symbols)}")
+
+    # --- Step 2: fetch + analyse each unique symbol ONCE ---
+    symbol_analysis: dict[str, sig_engine.FullAnalysis] = {}
+    for symbol in all_symbols:
+        try:
+            df = fetcher.fetch_ohlcv(symbol)
+            if df is None:
+                continue
+            snap = tech.compute(df, symbol, {**tech_cfg, **alert_cfg})
+            fundamentals = fetcher.fetch_fundamentals(symbol)
+            sector = fundamentals.get("sector", "")
+            asset_type = "etf" if not sector or sector == "Unknown" else "stock"
+            analysis = sig_engine.build_full_analysis(snap, fundamentals, asset_type)
+            symbol_analysis[symbol] = analysis
+        except Exception as e:
+            logger.error(f"Analysis failed for {symbol}: {e}")
+
+    # --- Step 3: build personalised digest per user and send ---
+    _resend.api_key = _os.getenv("RESEND_API_KEY", "")
+    processed = 0
+
+    for user in users:
+        try:
+            symbols = _json.loads(user["watchlist"])
+            user_analyses = [
+                symbol_analysis[s] for s in symbols if s in symbol_analysis
+            ]
+            if not user_analyses:
+                logger.warning(f"No valid analyses for {user['email']}")
+                continue
+
+            digest = build_digest(user_analyses)
+
+            # Override recipient to this specific user
+            original_recipients = _os.getenv("EMAIL_RECIPIENTS", "")
+            _os.environ["EMAIL_RECIPIENTS"] = user["email"]
+            send_morning_digest(digest)
+            _os.environ["EMAIL_RECIPIENTS"] = original_recipients
+
+            processed += 1
+            logger.info(f"Sent digest to {user['email']} ({len(user_analyses)} symbols)")
+
+        except Exception as e:
+            logger.error(f"Failed to process user {user.get('email')}: {e}")
+
+    logger.info(f"Multi-user run complete: {processed}/{len(users)} users processed")
+    return processed
+
+
 def run_intraday_check(watchlist_path: str = "config/watchlist.yml",
                        settings_path: str = "config/settings.yml") -> list[sig_engine.Alert]:
     """
