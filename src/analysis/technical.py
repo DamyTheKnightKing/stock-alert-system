@@ -1,7 +1,7 @@
 """
 Technical Analysis Engine.
 Computes RSI, MACD, moving averages, Bollinger Bands, support/resistance.
-Uses pandas-ta — pure Python, no C deps, reliable installation.
+Pure pandas/numpy — no external TA library deps.
 """
 import logging
 from dataclasses import dataclass, field
@@ -9,7 +9,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
 
 logger = logging.getLogger(__name__)
 
@@ -89,18 +88,17 @@ def compute(df: pd.DataFrame, symbol: str, settings: dict = None) -> TechnicalSn
     snap.trend = _classify_trend(price, snap.sma_50, snap.sma_200)
 
     # --- RSI ---
-    rsi_series = ta.rsi(df["close"], length=cfg["rsi_period"])
+    rsi_series = _compute_rsi(df["close"], cfg["rsi_period"])
     if rsi_series is not None and not rsi_series.empty:
         snap.rsi = float(rsi_series.iloc[-1])
         snap.rsi_signal = _classify_rsi(snap.rsi, cfg)
 
     # --- MACD ---
-    macd_df = ta.macd(df["close"],
-                      fast=12, slow=26, signal=9)
+    macd_df = _compute_macd(df["close"], fast=12, slow=26, signal=9)
     if macd_df is not None and not macd_df.empty:
-        snap.macd = float(macd_df.iloc[-1, 0])           # MACD line
-        snap.macd_histogram = float(macd_df.iloc[-1, 1]) # Histogram
-        snap.macd_signal_line = float(macd_df.iloc[-1, 2]) # Signal line
+        snap.macd = float(macd_df["macd"].iloc[-1])
+        snap.macd_histogram = float(macd_df["histogram"].iloc[-1])
+        snap.macd_signal_line = float(macd_df["signal"].iloc[-1])
         snap.macd_crossover = _detect_macd_crossover(macd_df)
 
     # --- Momentum Score ---
@@ -122,10 +120,10 @@ def compute(df: pd.DataFrame, symbol: str, settings: dict = None) -> TechnicalSn
         snap.pct_to_support = ((price - snap.support) / price) * 100
 
     # --- Bollinger Bands ---
-    bb = ta.bbands(df["close"], length=20, std=2)
+    bb = _compute_bbands(df["close"], length=20, std=2)
     if bb is not None and not bb.empty:
-        snap.bb_upper = float(bb.iloc[-1, 0])   # BBU
-        snap.bb_lower = float(bb.iloc[-1, 2])   # BBL
+        snap.bb_upper = float(bb["upper"].iloc[-1])
+        snap.bb_lower = float(bb["lower"].iloc[-1])
         snap.bb_position = _classify_bb_position(price, snap.bb_upper, snap.bb_lower)
 
     # --- 52-week context ---
@@ -207,13 +205,36 @@ def _classify_momentum(rsi: Optional[float], macd_hist: Optional[float], trend: 
     return "NEUTRAL"
 
 
+def _compute_rsi(close: pd.Series, length: int = 14) -> pd.Series:
+    delta = close.diff()
+    gain = delta.where(delta > 0, 0.0).ewm(com=length - 1, adjust=False).mean()
+    loss = (-delta.where(delta < 0, 0.0)).ewm(com=length - 1, adjust=False).mean()
+    rs = gain / loss.replace(0, np.nan)
+    return 100 - (100 / (1 + rs))
+
+
+def _compute_macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame:
+    ema_fast = close.ewm(span=fast, adjust=False).mean()
+    ema_slow = close.ewm(span=slow, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    histogram = macd - signal_line
+    return pd.DataFrame({"macd": macd, "signal": signal_line, "histogram": histogram})
+
+
+def _compute_bbands(close: pd.Series, length: int = 20, std: float = 2) -> pd.DataFrame:
+    sma = close.rolling(length).mean()
+    stddev = close.rolling(length).std()
+    return pd.DataFrame({"upper": sma + std * stddev, "mid": sma, "lower": sma - std * stddev})
+
+
 def _detect_macd_crossover(macd_df: pd.DataFrame) -> str:
     if len(macd_df) < 2:
         return "NONE"
-    macd_prev = macd_df.iloc[-2, 0]
-    macd_curr = macd_df.iloc[-1, 0]
-    sig_prev = macd_df.iloc[-2, 2]
-    sig_curr = macd_df.iloc[-1, 2]
+    macd_prev = macd_df["macd"].iloc[-2]
+    macd_curr = macd_df["macd"].iloc[-1]
+    sig_prev = macd_df["signal"].iloc[-2]
+    sig_curr = macd_df["signal"].iloc[-1]
     if macd_prev < sig_prev and macd_curr > sig_curr:
         return "BULLISH_CROSS"
     if macd_prev > sig_prev and macd_curr < sig_curr:
