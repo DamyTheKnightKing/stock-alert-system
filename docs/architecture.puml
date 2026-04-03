@@ -1,0 +1,84 @@
+@startuml Stock Alert System
+
+skinparam backgroundColor #FAFAFA
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam ArrowColor #555555
+skinparam ArrowThickness 1.5
+
+skinparam actor {
+  BackgroundColor #4A90D9
+  BorderColor #2C5F8A
+  FontColor white
+}
+
+skinparam rectangle {
+  BackgroundColor #EAF4FB
+  BorderColor #4A90D9
+  FontColor #1A1A1A
+  RoundCorner 12
+}
+
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #4A90D9
+  FontColor #1A1A1A
+}
+
+skinparam database {
+  BackgroundColor #FFF8E1
+  BorderColor #F5A623
+}
+
+skinparam cloud {
+  BackgroundColor #E8F5E9
+  BorderColor #4CAF50
+}
+
+actor "Subscriber" as user
+
+rectangle "GitHub Pages" as pages {
+  component "Signup Form\n(docs/index.html)\nStock autocomplete + schedule" as form
+}
+
+rectangle "Render.com  |  FastAPI" as render {
+  component "POST /api/subscribe\nGET  /api/search\nGET  /api/unsubscribe" as api
+}
+
+rectangle "GitHub Actions" as ga {
+  component "Daily Analysis\nMon–Fri  8:30 AM ET" as daily
+  component "Intraday Check\nEvery 30 min\nMarket hours" as intraday
+}
+
+database "Turso\n(libSQL Cloud)" as turso {
+  component "users\nprice_snapshots\nalerts\nanalysis_reports" as tables
+}
+
+cloud "Yahoo Finance\n(yfinance — free)" as yfinance
+
+rectangle "Resend\n(Email API)" as resend
+
+rectangle "Technical Analysis\n(pure pandas)" as ta {
+  component "RSI · MACD · SMA 20/50/200\nBollinger Bands · Support/Resistance\nVolume · Confluence Signals" as indicators
+}
+
+user --> form         : enters email\n+ watchlist
+form --> api          : POST /api/subscribe
+api --> turso         : upsert user record
+
+daily --> yfinance    : fetch OHLCV\n(all unique symbols)
+intraday --> yfinance : fetch OHLCV\n(all unique symbols)
+
+yfinance --> ta       : raw price data
+ta --> turso          : save snapshots\n+ alerts
+
+daily --> turso       : read active users\n+ pending alerts
+intraday --> turso    : read active users\n+ pending alerts
+
+daily --> resend      : morning digest\n(per user, top 3 ETF + stock)
+intraday --> resend   : intraday alert\n(confidence score >= 8 only)
+
+resend --> user       : personalized email
+
+@enduml
