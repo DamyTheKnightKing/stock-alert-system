@@ -1,14 +1,16 @@
 # Stock Alert System
 
-A fully automated US stock and ETF alert system that delivers personalized technical analysis emails to subscribers.
+> Personalized US stock and ETF alerts — delivered to your inbox, automatically.
 
-Built with Python, FastAPI, GitHub Actions, Turso, and Resend — all on free tiers.
+Subscribers pick their watchlist once. Every morning before market open, the system analyses every stock, detects trading signals, and delivers a personalised digest ranked by confidence. High-confidence intraday signals are sent in real time throughout the trading day.
+
+Zero infrastructure cost — runs entirely on free tiers.
 
 ---
 
 ## Architecture
 
-![Architecture Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/theknightcodes/stock-alert-system/main/docs/architecture.puml)
+![Architecture Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&fmt=svg&src=https://raw.githubusercontent.com/theknightcodes/stock-alert-system/main/docs/architecture.puml)
 
 ---
 
