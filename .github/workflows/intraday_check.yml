@@ -1,10 +1,10 @@
 name: Intraday Signal Check
 
 on:
-  schedule:
-    # Every 30 minutes during US market hours (9:30 AM – 4:00 PM ET = 14:30–21:00 UTC)
-    - cron: "0,30 14-20 * * 1-5"
-    - cron: "0 21 * * 1-5"    # Final check at market close
+  # Schedule disabled — re-enable when intraday alerts are ready
+  # schedule:
+  #   - cron: "0,30 14-20 * * 1-5"
+  #   - cron: "0 21 * * 1-5"
   workflow_dispatch:
 
 jobs:
