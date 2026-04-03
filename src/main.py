@@ -65,7 +65,7 @@ def cmd_daily(all_users: bool = False):
             if pending:
                 mark_alerts_notified([a["id"] for a in pending])
 
-    purge_old_records(retention_days=90)
+    purge_old_records(retention_days=7)
     logger.info("=== DAILY ANALYSIS COMPLETE ===")
 
 
