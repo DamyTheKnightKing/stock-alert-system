@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Stock Alert System API", version="1.0.0")
 
-ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "https://damytheknightking.github.io")
+ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "https://theknightcodes.github.io")
 
 app.add_middleware(
     CORSMiddleware,
@@ -232,7 +232,7 @@ def _unsubscribe_html(message: str, success: bool = False) -> str:
       <div style="font-size:40px;">{'✓' if success else '✗'}</div>
       <h2 style="color:{color};margin:12px 0;">{'Unsubscribed' if success else 'Error'}</h2>
       <p style="color:#555;">{message}</p>
-      <a href="https://damytheknightking.github.io/stock-alert-system"
+      <a href="https://theknightcodes.github.io/stock-alert-system"
          style="display:inline-block;margin-top:16px;padding:10px 24px;
                 background:#1a1a2e;color:#fff;border-radius:6px;text-decoration:none;">
         Subscribe Again
