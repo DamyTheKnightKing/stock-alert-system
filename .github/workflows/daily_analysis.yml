@@ -29,8 +29,7 @@ jobs:
 
       - name: Run daily analysis
         env:
-          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           LOG_LEVEL: INFO
