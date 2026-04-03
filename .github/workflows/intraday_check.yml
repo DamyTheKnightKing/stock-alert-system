@@ -33,6 +33,6 @@ jobs:
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
-          DATABASE_URL: sqlite:///data/stock_alerts.db
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           LOG_LEVEL: INFO
         run: python -m src.main intraday
