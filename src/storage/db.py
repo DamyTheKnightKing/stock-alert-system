@@ -1,187 +1,229 @@
 """
-Storage Layer — SQLite by default.
-Zero setup, zero cost. Swap to PostgreSQL/Supabase by setting DATABASE_URL env var.
-SQLAlchemy abstracts the database — same code works for both.
+Storage Layer.
+- Turso (libsql): cloud persistent, free tier, never pauses  [DEFAULT when DATABASE_URL set]
+- SQLite: local fallback, zero setup                         [fallback]
+
+libsql_experimental is used directly (not via SQLAlchemy) because the SQLAlchemy
+pysqlite dialect calls create_function() which libsql doesn't support.
+Raw SQL is used instead — explicit, portable, no ORM magic.
 """
 import json
 import logging
 import os
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-
-from sqlalchemy import (Column, DateTime, Float, Integer, String, Text,
-                        create_engine, text)
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/stock_alerts.db")
 
-# SQLite: ensure the data/ directory exists
-if DATABASE_URL.startswith("sqlite"):
-    db_path = DATABASE_URL.replace("sqlite:///", "")
-    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+# --- Connection factory ---
 
-engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
-
-
-class Base(DeclarativeBase):
-    pass
-
-
-class PriceSnapshot(Base):
-    """Daily OHLCV + key indicator snapshot per symbol."""
-    __tablename__ = "price_snapshots"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(10), nullable=False, index=True)
-    date = Column(DateTime, nullable=False, index=True)
-    open = Column(Float)
-    high = Column(Float)
-    low = Column(Float)
-    close = Column(Float)
-    volume = Column(Float)
-    sma_20 = Column(Float)
-    sma_50 = Column(Float)
-    sma_200 = Column(Float)
-    rsi = Column(Float)
-    macd = Column(Float)
-    macd_signal = Column(Float)
-    macd_histogram = Column(Float)
-    trend = Column(String(20))
-    momentum = Column(String(20))
-    volume_signal = Column(String(20))
-    support = Column(Float)
-    resistance = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
+def _parse_turso_url(url: str) -> tuple[str, str]:
+    """Extract sync_url and auth_token from libsql+https://host?authToken=token"""
+    url_part = url.replace("libsql+https://", "").replace("libsql://", "")
+    if "?authToken=" in url_part:
+        host, token = url_part.split("?authToken=", 1)
+    else:
+        host, token = url_part, ""
+    return f"https://{host}", token
 
 
-class AlertRecord(Base):
-    """Persisted alert with full context."""
-    __tablename__ = "alerts"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(10), nullable=False, index=True)
-    signal_type = Column(String(50), nullable=False)
-    condition = Column(Text)
-    action = Column(String(30))
-    action_detail = Column(Text)
-    confidence = Column(String(10))
-    confidence_score = Column(Integer)
-    entry_zone = Column(String(50))
-    exit_target = Column(String(50))
-    stop_loss = Column(String(50))
-    risk_pct = Column(Float)
-    is_pre_signal = Column(Integer, default=0)  # SQLite bool
-    triggered_at = Column(DateTime, nullable=False)
-    notified = Column(Integer, default=0)   # 0 = pending, 1 = sent
-    created_at = Column(DateTime, default=datetime.utcnow)
+def _get_connection():
+    """Return a DB connection — Turso or SQLite depending on DATABASE_URL."""
+    if DATABASE_URL.startswith("libsql"):
+        import libsql_experimental as libsql
+        sync_url, token = _parse_turso_url(DATABASE_URL)
+        conn = libsql.connect("turso_local.db", sync_url=sync_url, auth_token=token)
+        conn.sync()
+        return conn, True   # (connection, is_turso)
+    else:
+        db_path = DATABASE_URL.replace("sqlite:///", "")
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return conn, False
 
 
-class AnalysisReport(Base):
-    """Full analysis report stored as JSON blob (queryable by symbol/date)."""
-    __tablename__ = "analysis_reports"
+@contextmanager
+def _db():
+    """Context manager: get connection, commit + sync on exit, close on done."""
+    conn, is_turso = _get_connection()
+    try:
+        yield conn
+        conn.commit()
+        if is_turso:
+            conn.sync()
+    except Exception:
+        conn.rollback() if hasattr(conn, 'rollback') else None
+        raise
+    finally:
+        conn.close()
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(10), nullable=False, index=True)
-    asset_type = Column(String(10))
-    report_date = Column(DateTime, nullable=False, index=True)
-    trend = Column(String(20))
-    momentum = Column(String(20))
-    confidence_score = Column(Integer)
-    lt_stance = Column(String(20))
-    payload = Column(Text)   # Full JSON for email rendering
-    created_at = Column(DateTime, default=datetime.utcnow)
+
+# --- Schema ---
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS price_snapshots (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol       TEXT NOT NULL,
+    date         TEXT NOT NULL,
+    open         REAL,
+    high         REAL,
+    low          REAL,
+    close        REAL,
+    volume       REAL,
+    sma_20       REAL,
+    sma_50       REAL,
+    sma_200      REAL,
+    rsi          REAL,
+    macd         REAL,
+    macd_signal  REAL,
+    macd_histogram REAL,
+    trend        TEXT,
+    momentum     TEXT,
+    volume_signal TEXT,
+    support      REAL,
+    resistance   REAL,
+    created_at   TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol           TEXT NOT NULL,
+    signal_type      TEXT NOT NULL,
+    condition        TEXT,
+    action           TEXT,
+    action_detail    TEXT,
+    confidence       TEXT,
+    confidence_score INTEGER,
+    entry_zone       TEXT,
+    exit_target      TEXT,
+    stop_loss        TEXT,
+    risk_pct         REAL,
+    is_pre_signal    INTEGER DEFAULT 0,
+    triggered_at     TEXT NOT NULL,
+    notified         INTEGER DEFAULT 0,
+    created_at       TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS analysis_reports (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol           TEXT NOT NULL,
+    asset_type       TEXT,
+    report_date      TEXT NOT NULL,
+    trend            TEXT,
+    momentum         TEXT,
+    confidence_score INTEGER,
+    lt_stance        TEXT,
+    payload          TEXT,
+    created_at       TEXT DEFAULT (datetime('now'))
+);
+"""
 
 
 def init_db():
     """Create all tables if they don't exist."""
-    Base.metadata.create_all(engine)
-    logger.info(f"Database initialized: {DATABASE_URL}")
+    with _db() as conn:
+        for statement in SCHEMA.strip().split(";"):
+            stmt = statement.strip()
+            if stmt:
+                conn.execute(stmt)
+    logger.info(f"Database initialized: {DATABASE_URL.split('?')[0]}")  # hide token in logs
 
 
-def save_price_snapshot(snap_data: dict):
-    with SessionLocal() as session:
-        record = PriceSnapshot(**snap_data)
-        session.add(record)
-        session.commit()
-        logger.debug(f"Saved price snapshot: {snap_data.get('symbol')}")
+def save_price_snapshot(data: dict):
+    sql = """
+        INSERT INTO price_snapshots
+            (symbol, date, open, high, low, close, volume,
+             sma_20, sma_50, sma_200, rsi, macd, macd_signal, macd_histogram,
+             trend, momentum, volume_signal, support, resistance)
+        VALUES
+            (:symbol, :date, :open, :high, :low, :close, :volume,
+             :sma_20, :sma_50, :sma_200, :rsi, :macd, :macd_signal, :macd_histogram,
+             :trend, :momentum, :volume_signal, :support, :resistance)
+    """
+    with _db() as conn:
+        conn.execute(sql, _coerce(data))
+    logger.debug(f"Saved snapshot: {data.get('symbol')}")
 
 
-def save_alert(alert_data: dict) -> int:
-    with SessionLocal() as session:
-        record = AlertRecord(**alert_data)
-        session.add(record)
-        session.commit()
-        session.refresh(record)
-        logger.info(f"Saved alert: {alert_data.get('symbol')} — {alert_data.get('signal_type')}")
-        return record.id
+def save_alert(data: dict) -> int:
+    sql = """
+        INSERT INTO alerts
+            (symbol, signal_type, condition, action, action_detail,
+             confidence, confidence_score, entry_zone, exit_target,
+             stop_loss, risk_pct, is_pre_signal, triggered_at)
+        VALUES
+            (:symbol, :signal_type, :condition, :action, :action_detail,
+             :confidence, :confidence_score, :entry_zone, :exit_target,
+             :stop_loss, :risk_pct, :is_pre_signal, :triggered_at)
+    """
+    with _db() as conn:
+        cur = conn.execute(sql, _coerce(data))
+        row_id = cur.lastrowid
+    logger.info(f"Saved alert: {data.get('symbol')} — {data.get('signal_type')}")
+    return row_id
 
 
-def save_analysis_report(report_data: dict):
-    with SessionLocal() as session:
-        record = AnalysisReport(**report_data)
-        session.add(record)
-        session.commit()
-        logger.debug(f"Saved analysis report: {report_data.get('symbol')}")
+def save_analysis_report(data: dict):
+    sql = """
+        INSERT INTO analysis_reports
+            (symbol, asset_type, report_date, trend, momentum,
+             confidence_score, lt_stance, payload)
+        VALUES
+            (:symbol, :asset_type, :report_date, :trend, :momentum,
+             :confidence_score, :lt_stance, :payload)
+    """
+    with _db() as conn:
+        conn.execute(sql, _coerce(data))
+    logger.debug(f"Saved report: {data.get('symbol')}")
 
 
 def get_pending_alerts() -> list[dict]:
-    """Fetch all unsent alerts for notification dispatch."""
-    with SessionLocal() as session:
-        rows = session.query(AlertRecord).filter(AlertRecord.notified == 0).all()
-        return [_alert_to_dict(r) for r in rows]
+    with _db() as conn:
+        cur = conn.execute("SELECT * FROM alerts WHERE notified = 0")
+        return [dict(row) for row in cur.fetchall()]
 
 
 def mark_alerts_notified(alert_ids: list[int]):
-    with SessionLocal() as session:
-        session.query(AlertRecord).filter(
-            AlertRecord.id.in_(alert_ids)
-        ).update({"notified": 1}, synchronize_session=False)
-        session.commit()
+    if not alert_ids:
+        return
+    placeholders = ",".join("?" * len(alert_ids))
+    with _db() as conn:
+        conn.execute(
+            f"UPDATE alerts SET notified = 1 WHERE id IN ({placeholders})",
+            alert_ids
+        )
 
 
 def get_recent_snapshots(symbol: str, days: int = 7) -> list[dict]:
-    cutoff = datetime.utcnow() - timedelta(days=days)
-    with SessionLocal() as session:
-        rows = session.query(PriceSnapshot).filter(
-            PriceSnapshot.symbol == symbol,
-            PriceSnapshot.date >= cutoff
-        ).order_by(PriceSnapshot.date.desc()).all()
-        return [_snapshot_to_dict(r) for r in rows]
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    with _db() as conn:
+        cur = conn.execute(
+            "SELECT * FROM price_snapshots WHERE symbol = ? AND date >= ? ORDER BY date DESC",
+            (symbol, cutoff)
+        )
+        return [dict(row) for row in cur.fetchall()]
 
 
 def purge_old_records(retention_days: int = 90):
-    """Remove records older than retention period."""
-    cutoff = datetime.utcnow() - timedelta(days=retention_days)
-    with SessionLocal() as session:
-        deleted_alerts = session.query(AlertRecord).filter(
-            AlertRecord.created_at < cutoff
-        ).delete()
-        deleted_snaps = session.query(PriceSnapshot).filter(
-            PriceSnapshot.created_at < cutoff
-        ).delete()
-        deleted_reports = session.query(AnalysisReport).filter(
-            AnalysisReport.created_at < cutoff
-        ).delete()
-        session.commit()
-        logger.info(f"Purged: {deleted_alerts} alerts, {deleted_snaps} snapshots, {deleted_reports} reports")
+    cutoff = (datetime.utcnow() - timedelta(days=retention_days)).isoformat()
+    with _db() as conn:
+        r1 = conn.execute("DELETE FROM alerts WHERE created_at < ?", (cutoff,)).rowcount
+        r2 = conn.execute("DELETE FROM price_snapshots WHERE created_at < ?", (cutoff,)).rowcount
+        r3 = conn.execute("DELETE FROM analysis_reports WHERE created_at < ?", (cutoff,)).rowcount
+    logger.info(f"Purged: {r1} alerts, {r2} snapshots, {r3} reports")
 
 
-def _alert_to_dict(r: AlertRecord) -> dict:
-    return {
-        "id": r.id, "symbol": r.symbol, "signal_type": r.signal_type,
-        "condition": r.condition, "action": r.action, "action_detail": r.action_detail,
-        "confidence": r.confidence, "confidence_score": r.confidence_score,
-        "entry_zone": r.entry_zone, "exit_target": r.exit_target,
-        "stop_loss": r.stop_loss, "risk_pct": r.risk_pct,
-        "is_pre_signal": bool(r.is_pre_signal), "triggered_at": r.triggered_at,
-    }
-
-
-def _snapshot_to_dict(r: PriceSnapshot) -> dict:
-    return {
-        "symbol": r.symbol, "date": r.date, "close": r.close,
-        "rsi": r.rsi, "trend": r.trend, "momentum": r.momentum,
-    }
+def _coerce(data: dict) -> dict:
+    """Convert datetime objects to ISO strings for storage."""
+    out = {}
+    for k, v in data.items():
+        if isinstance(v, datetime):
+            out[k] = v.isoformat()
+        else:
+            out[k] = v
+    return out

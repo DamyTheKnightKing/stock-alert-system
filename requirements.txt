@@ -5,7 +5,8 @@ pandas-ta>=0.3.14b
 numpy>=1.24.0
 
 # Storage
-SQLAlchemy>=2.0.0
+SQLAlchemy>=2.0.0       # used for PostgreSQL path if needed
+libsql-experimental     # Turso (libSQL) driver — primary DB
 
 # Config & env
 python-dotenv>=1.0.0
