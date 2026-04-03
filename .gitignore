@@ -18,6 +18,14 @@ build/
 venv/
 env/
 
+# Turso local sync files
+turso_local.db*
+:memory:*
+*.db-shm
+*.db-wal
+resend.yml
+turso_db.md
+
 # macOS
 .DS_Store
 
