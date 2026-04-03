@@ -1,11 +1,10 @@
 """
 Storage Layer.
-- Turso (libsql): cloud persistent, free tier, never pauses  [DEFAULT when DATABASE_URL set]
-- SQLite: local fallback, zero setup                         [fallback]
+- Turso HTTP API: cloud persistent, free, zero native deps  [when DATABASE_URL=libsql+https://]
+- SQLite: local fallback, zero setup                        [when DATABASE_URL=sqlite:///]
 
-libsql_experimental is used directly (not via SQLAlchemy) because the SQLAlchemy
-pysqlite dialect calls create_function() which libsql doesn't support.
-Raw SQL is used instead — explicit, portable, no ORM magic.
+Uses Turso's HTTP API (/v2/pipeline) instead of libsql-experimental,
+so no Rust compilation needed — works on any Python version, any platform.
 """
 import json
 import logging
@@ -14,15 +13,17 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/stock_alerts.db")
 
-# --- Connection factory ---
+# ---------------------------------------------------------------------------
+# Turso HTTP API client
+# ---------------------------------------------------------------------------
 
 def _parse_turso_url(url: str) -> tuple[str, str]:
-    """Extract sync_url and auth_token from libsql+https://host?authToken=token"""
     url_part = url.replace("libsql+https://", "").replace("libsql://", "")
     if "?authToken=" in url_part:
         host, token = url_part.split("?authToken=", 1)
@@ -31,14 +32,105 @@ def _parse_turso_url(url: str) -> tuple[str, str]:
     return f"https://{host}", token
 
 
+class TursoClient:
+    """Minimal Turso HTTP API client — no native deps, pure httpx."""
+
+    def __init__(self, url: str, token: str):
+        self.url = f"{url}/v2/pipeline"
+        self.headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        self._pending: list[dict] = []
+        self._last_rowid: Optional[int] = None
+
+    def execute(self, sql: str, params: tuple = ()):
+        import httpx
+        args = [self._to_value(p) for p in params]
+        stmt = {"sql": sql, "args": args}
+        payload = {"requests": [
+            {"type": "execute", "stmt": stmt},
+            {"type": "close"},
+        ]}
+        resp = httpx.post(self.url, headers=self.headers,
+                          content=json.dumps(payload), timeout=15.0)
+        resp.raise_for_status()
+        data = resp.json()
+        result = data["results"][0]["response"]["result"]
+        self._last_result = result
+        self._last_rowid = int(result.get("last_insert_rowid") or 0) or None
+        return _TursoCursor(result)
+
+    def executescript(self, script: str):
+        """Execute multiple statements separated by semicolons."""
+        for stmt in script.strip().split(";"):
+            s = stmt.strip()
+            if s:
+                self.execute(s)
+
+    def commit(self):
+        pass   # Turso auto-commits each HTTP request
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+    @property
+    def lastrowid(self):
+        return self._last_rowid
+
+    @staticmethod
+    def _to_value(v) -> dict:
+        if v is None:
+            return {"type": "null", "value": None}
+        if isinstance(v, bool):
+            return {"type": "integer", "value": "1" if v else "0"}
+        if isinstance(v, int):
+            return {"type": "integer", "value": str(v)}
+        if isinstance(v, float):
+            return {"type": "real", "value": str(v)}
+        return {"type": "text", "value": str(v)}
+
+
+class _TursoCursor:
+    """Mimics sqlite3.Cursor for row fetching."""
+
+    def __init__(self, result: dict):
+        self._cols = [c["name"] for c in result.get("cols", [])]
+        self._rows = result.get("rows", [])
+        self._idx = 0
+        self.lastrowid = int(result.get("last_insert_rowid") or 0) or None
+        self.rowcount = result.get("affected_row_count", 0)
+
+    @property
+    def description(self):
+        return [(c,) for c in self._cols]
+
+    def fetchone(self):
+        if self._idx >= len(self._rows):
+            return None
+        row = self._rows[self._idx]
+        self._idx += 1
+        return [v["value"] if isinstance(v, dict) else v for v in row]
+
+    def fetchall(self):
+        rows = []
+        for row in self._rows[self._idx:]:
+            rows.append([v["value"] if isinstance(v, dict) else v for v in row])
+        self._idx = len(self._rows)
+        return rows
+
+
+# ---------------------------------------------------------------------------
+# Connection factory
+# ---------------------------------------------------------------------------
+
 def _get_connection():
-    """Return a DB connection — Turso or SQLite depending on DATABASE_URL."""
     if DATABASE_URL.startswith("libsql"):
-        import libsql_experimental as libsql
         sync_url, token = _parse_turso_url(DATABASE_URL)
-        conn = libsql.connect("turso_local.db", sync_url=sync_url, auth_token=token)
-        conn.sync()
-        return conn, True   # (connection, is_turso)
+        return TursoClient(sync_url, token), True
     else:
         db_path = DATABASE_URL.replace("sqlite:///", "")
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -49,21 +141,21 @@ def _get_connection():
 
 @contextmanager
 def _db():
-    """Context manager: get connection, commit + sync on exit, close on done."""
     conn, is_turso = _get_connection()
     try:
         yield conn
         conn.commit()
-        if is_turso:
-            conn.sync()
     except Exception:
-        conn.rollback() if hasattr(conn, 'rollback') else None
+        if hasattr(conn, "rollback"):
+            conn.rollback()
         raise
     finally:
         conn.close()
 
 
-# --- Schema ---
+# ---------------------------------------------------------------------------
+# Schema
+# ---------------------------------------------------------------------------
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -81,23 +173,11 @@ CREATE TABLE IF NOT EXISTS price_snapshots (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol       TEXT NOT NULL,
     date         TEXT NOT NULL,
-    open         REAL,
-    high         REAL,
-    low          REAL,
-    close        REAL,
-    volume       REAL,
-    sma_20       REAL,
-    sma_50       REAL,
-    sma_200      REAL,
-    rsi          REAL,
-    macd         REAL,
-    macd_signal  REAL,
-    macd_histogram REAL,
-    trend        TEXT,
-    momentum     TEXT,
-    volume_signal TEXT,
-    support      REAL,
-    resistance   REAL,
+    open         REAL, high REAL, low REAL, close REAL, volume REAL,
+    sma_20       REAL, sma_50 REAL, sma_200 REAL,
+    rsi          REAL, macd REAL, macd_signal REAL, macd_histogram REAL,
+    trend        TEXT, momentum TEXT, volume_signal TEXT,
+    support      REAL, resistance REAL,
     created_at   TEXT DEFAULT (datetime('now'))
 );
 
@@ -105,16 +185,10 @@ CREATE TABLE IF NOT EXISTS alerts (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol           TEXT NOT NULL,
     signal_type      TEXT NOT NULL,
-    condition        TEXT,
-    action           TEXT,
-    action_detail    TEXT,
-    confidence       TEXT,
-    confidence_score INTEGER,
-    entry_zone       TEXT,
-    exit_target      TEXT,
-    stop_loss        TEXT,
-    risk_pct         REAL,
-    is_pre_signal    INTEGER DEFAULT 0,
+    condition        TEXT, action TEXT, action_detail TEXT,
+    confidence       TEXT, confidence_score INTEGER,
+    entry_zone       TEXT, exit_target TEXT, stop_loss TEXT,
+    risk_pct         REAL, is_pre_signal INTEGER DEFAULT 0,
     triggered_at     TEXT NOT NULL,
     notified         INTEGER DEFAULT 0,
     created_at       TEXT DEFAULT (datetime('now'))
@@ -123,27 +197,52 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE TABLE IF NOT EXISTS analysis_reports (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol           TEXT NOT NULL,
-    asset_type       TEXT,
-    report_date      TEXT NOT NULL,
-    trend            TEXT,
-    momentum         TEXT,
-    confidence_score INTEGER,
-    lt_stance        TEXT,
-    payload          TEXT,
+    asset_type       TEXT, report_date TEXT NOT NULL,
+    trend            TEXT, momentum TEXT,
+    confidence_score INTEGER, lt_stance TEXT, payload TEXT,
     created_at       TEXT DEFAULT (datetime('now'))
-);
+)
 """
 
 
 def init_db():
-    """Create all tables if they don't exist."""
     with _db() as conn:
-        for statement in SCHEMA.strip().split(";"):
-            stmt = statement.strip()
-            if stmt:
-                conn.execute(stmt)
-    logger.info(f"Database initialized: {DATABASE_URL.split('?')[0]}")  # hide token in logs
+        for stmt in SCHEMA.strip().split(";"):
+            s = stmt.strip()
+            if s:
+                conn.execute(s)
+    logger.info(f"Database initialized: {DATABASE_URL.split('?')[0]}")
 
+
+# ---------------------------------------------------------------------------
+# Row helpers
+# ---------------------------------------------------------------------------
+
+def _rows_to_dicts(cursor) -> list[dict]:
+    cols = [d[0] for d in cursor.description]
+    return [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+
+def _row_to_dict(cursor, row) -> Optional[dict]:
+    if row is None:
+        return None
+    cols = [d[0] for d in cursor.description]
+    return dict(zip(cols, row))
+
+
+def _coerce(data: dict) -> dict:
+    out = {}
+    for k, v in data.items():
+        if isinstance(v, datetime):
+            out[k] = v.isoformat()
+        else:
+            out[k] = v
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Price snapshots
+# ---------------------------------------------------------------------------
 
 def save_price_snapshot(data: dict):
     d = _coerce(data)
@@ -184,7 +283,7 @@ def save_alert(data: dict) -> int:
         ))
         row_id = cur.lastrowid
     logger.info(f"Saved alert: {data.get('symbol')} — {data.get('signal_type')}")
-    return row_id
+    return row_id or 0
 
 
 def save_analysis_report(data: dict):
@@ -217,7 +316,7 @@ def mark_alerts_notified(alert_ids: list[int]):
     with _db() as conn:
         conn.execute(
             f"UPDATE alerts SET notified = 1 WHERE id IN ({placeholders})",
-            alert_ids
+            tuple(alert_ids),
         )
 
 
@@ -226,7 +325,7 @@ def get_recent_snapshots(symbol: str, days: int = 7) -> list[dict]:
     with _db() as conn:
         cur = conn.execute(
             "SELECT * FROM price_snapshots WHERE symbol = ? AND date >= ? ORDER BY date DESC",
-            (symbol, cutoff)
+            (symbol, cutoff),
         )
         return _rows_to_dicts(cur)
 
@@ -240,45 +339,20 @@ def purge_old_records(retention_days: int = 90):
     logger.info(f"Purged: {r1} alerts, {r2} snapshots, {r3} reports")
 
 
-def _rows_to_dicts(cursor) -> list[dict]:
-    """Convert raw cursor rows (tuples or Row objects) to dicts using column names."""
-    cols = [d[0] for d in cursor.description]
-    return [dict(zip(cols, row)) for row in cursor.fetchall()]
-
-
-def _row_to_dict(cursor, row) -> dict | None:
-    if row is None:
-        return None
-    cols = [d[0] for d in cursor.description]
-    return dict(zip(cols, row))
-
-
-def _coerce(data: dict) -> dict:
-    """Convert datetime objects to ISO strings for storage."""
-    out = {}
-    for k, v in data.items():
-        if isinstance(v, datetime):
-            out[k] = v.isoformat()
-        else:
-            out[k] = v
-    return out
-
-
 # ---------------------------------------------------------------------------
 # User management
 # ---------------------------------------------------------------------------
 
 def save_user(data: dict):
-    """Insert or update a user subscription (upsert on email)."""
     with _db() as conn:
         conn.execute("""
             INSERT INTO users (email, watchlist, schedule, active, unsubscribe_token)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?,?,?,?,?)
             ON CONFLICT(email) DO UPDATE SET
-                watchlist           = excluded.watchlist,
-                schedule            = excluded.schedule,
-                active              = 1,
-                updated_at          = datetime('now')
+                watchlist         = excluded.watchlist,
+                schedule          = excluded.schedule,
+                active            = 1,
+                updated_at        = datetime('now')
         """, (
             data["email"], data["watchlist"],
             data.get("schedule", "morning"),
@@ -289,28 +363,21 @@ def save_user(data: dict):
 
 
 def get_active_users() -> list[dict]:
-    """Fetch all active subscribers."""
     with _db() as conn:
-        cur = conn.execute(
-            "SELECT * FROM users WHERE active = 1 ORDER BY created_at ASC"
-        )
+        cur = conn.execute("SELECT * FROM users WHERE active = 1 ORDER BY created_at ASC")
         return _rows_to_dicts(cur)
 
 
-def get_user_by_token(token: str) -> dict | None:
-    """Look up user by unsubscribe token."""
+def get_user_by_token(token: str) -> Optional[dict]:
     with _db() as conn:
-        cur = conn.execute(
-            "SELECT * FROM users WHERE unsubscribe_token = ?", (token,)
-        )
+        cur = conn.execute("SELECT * FROM users WHERE unsubscribe_token = ?", (token,))
         return _row_to_dict(cur, cur.fetchone())
 
 
 def unsubscribe_user(token: str):
-    """Mark user as inactive via unsubscribe token."""
     with _db() as conn:
         conn.execute(
             "UPDATE users SET active = 0, updated_at = datetime('now') WHERE unsubscribe_token = ?",
-            (token,)
+            (token,),
         )
-    logger.info(f"User unsubscribed via token: {token[:8]}...")
+    logger.info(f"Unsubscribed token: {token[:8]}...")

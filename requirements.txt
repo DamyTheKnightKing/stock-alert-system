@@ -6,7 +6,7 @@ numpy>=1.24.0
 
 # Storage
 SQLAlchemy>=2.0.0       # used for PostgreSQL path if needed
-libsql-experimental     # Turso (libSQL) driver — primary DB
+# Turso: uses HTTP API via httpx — no native driver needed
 
 # Config & env
 python-dotenv>=1.0.0
