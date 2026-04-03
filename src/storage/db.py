@@ -135,50 +135,61 @@ def init_db():
 
 
 def save_price_snapshot(data: dict):
+    d = _coerce(data)
     sql = """
         INSERT INTO price_snapshots
             (symbol, date, open, high, low, close, volume,
              sma_20, sma_50, sma_200, rsi, macd, macd_signal, macd_histogram,
              trend, momentum, volume_signal, support, resistance)
-        VALUES
-            (:symbol, :date, :open, :high, :low, :close, :volume,
-             :sma_20, :sma_50, :sma_200, :rsi, :macd, :macd_signal, :macd_histogram,
-             :trend, :momentum, :volume_signal, :support, :resistance)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """
     with _db() as conn:
-        conn.execute(sql, _coerce(data))
+        conn.execute(sql, (
+            d.get("symbol"), d.get("date"), d.get("open"), d.get("high"),
+            d.get("low"), d.get("close"), d.get("volume"), d.get("sma_20"),
+            d.get("sma_50"), d.get("sma_200"), d.get("rsi"), d.get("macd"),
+            d.get("macd_signal"), d.get("macd_histogram"), d.get("trend"),
+            d.get("momentum"), d.get("volume_signal"), d.get("support"), d.get("resistance"),
+        ))
     logger.debug(f"Saved snapshot: {data.get('symbol')}")
 
 
 def save_alert(data: dict) -> int:
+    d = _coerce(data)
     sql = """
         INSERT INTO alerts
             (symbol, signal_type, condition, action, action_detail,
              confidence, confidence_score, entry_zone, exit_target,
              stop_loss, risk_pct, is_pre_signal, triggered_at)
-        VALUES
-            (:symbol, :signal_type, :condition, :action, :action_detail,
-             :confidence, :confidence_score, :entry_zone, :exit_target,
-             :stop_loss, :risk_pct, :is_pre_signal, :triggered_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     """
     with _db() as conn:
-        cur = conn.execute(sql, _coerce(data))
+        cur = conn.execute(sql, (
+            d.get("symbol"), d.get("signal_type"), d.get("condition"),
+            d.get("action"), d.get("action_detail"), d.get("confidence"),
+            d.get("confidence_score"), d.get("entry_zone"), d.get("exit_target"),
+            d.get("stop_loss"), d.get("risk_pct"), d.get("is_pre_signal"),
+            d.get("triggered_at"),
+        ))
         row_id = cur.lastrowid
     logger.info(f"Saved alert: {data.get('symbol')} — {data.get('signal_type')}")
     return row_id
 
 
 def save_analysis_report(data: dict):
+    d = _coerce(data)
     sql = """
         INSERT INTO analysis_reports
             (symbol, asset_type, report_date, trend, momentum,
              confidence_score, lt_stance, payload)
-        VALUES
-            (:symbol, :asset_type, :report_date, :trend, :momentum,
-             :confidence_score, :lt_stance, :payload)
+        VALUES (?,?,?,?,?,?,?,?)
     """
     with _db() as conn:
-        conn.execute(sql, _coerce(data))
+        conn.execute(sql, (
+            d.get("symbol"), d.get("asset_type"), d.get("report_date"),
+            d.get("trend"), d.get("momentum"), d.get("confidence_score"),
+            d.get("lt_stance"), d.get("payload"),
+        ))
     logger.debug(f"Saved report: {data.get('symbol')}")
 
 
