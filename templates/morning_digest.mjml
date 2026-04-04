@@ -404,7 +404,6 @@
     </mj-section>
 
     {% for a in featured %}
-    {% if a.news or a.reddit %}
     <mj-section background-color="#ffffff" padding="6px 24px">
       <mj-column>
         <mj-text padding="10px 14px" background-color="#f8f9fa" border-radius="8px">
@@ -455,10 +454,13 @@
           </div>
           {% endif %}
 
+          {% if not a.news and not a.reddit %}
+          <div style="font-size:12px;color:#aaa;padding:4px 0;">No recent news or social data available.</div>
+          {% endif %}
+
         </mj-text>
       </mj-column>
     </mj-section>
-    {% endif %}
     {% endfor %}
 
     <mj-section background-color="#ffffff" padding="0 24px 10px 24px">

@@ -154,12 +154,15 @@ def run_for_all_users() -> int:
             analysis = sig_engine.build_full_analysis(snap, fundamentals, asset_type)
             try:
                 analysis.news = fetch_news(symbol, max_items=3)
-            except Exception:
-                pass
+                logger.info(f"{symbol}: news={len(analysis.news)} items")
+            except Exception as e:
+                logger.warning(f"{symbol}: news fetch failed — {e}")
             try:
                 analysis.reddit = fetch_reddit_sentiment(symbol)
-            except Exception:
-                pass
+                if analysis.reddit:
+                    logger.info(f"{symbol}: reddit={analysis.reddit.overall} ({analysis.reddit.mention_count} mentions)")
+            except Exception as e:
+                logger.warning(f"{symbol}: reddit fetch failed — {e}")
             symbol_analysis[symbol] = analysis
         except Exception as e:
             logger.error(f"Analysis failed for {symbol}: {e}")
