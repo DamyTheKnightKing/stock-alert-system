@@ -1,0 +1,17 @@
+name: Keep API Warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping API
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            https://stock-alert-system-tods.onrender.com/ | grep -q "200" \
+            && echo "API is warm" || echo "API returned non-200"
