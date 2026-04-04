@@ -10,6 +10,7 @@ Endpoints:
 import json
 import logging
 import os
+import re
 import secrets
 
 import httpx
@@ -17,6 +18,9 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr, field_validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from src.storage.db import (get_user_by_token, init_db, save_user,
                              unsubscribe_user)
@@ -24,9 +28,16 @@ from src.storage.db import (get_user_by_token, init_db, save_user,
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Stock Alert System API", version="1.0.0")
+# ---------------------------------------------------------------------------
+# Rate limiter
+# ---------------------------------------------------------------------------
 
-ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "https://theknightcodes.github.io")
+limiter = Limiter(key_func=get_remote_address)
+app = FastAPI(title="Stock Alert System API", version="1.0.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "https://alerts.theknightcodes.com")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +45,9 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Valid stock symbol: 1-6 uppercase letters/numbers only
+SYMBOL_RE = re.compile(r'^[A-Z0-9]{1,6}$')
 
 
 @app.on_event("startup")
@@ -49,7 +63,7 @@ async def startup():
 class SubscribeRequest(BaseModel):
     email: EmailStr
     symbols: list[str]
-    schedule: str = "morning"   # morning / evening / both
+    schedule: str = "morning"
 
     @field_validator("symbols")
     @classmethod
@@ -58,7 +72,11 @@ class SubscribeRequest(BaseModel):
             raise ValueError("Select at least 1 symbol")
         if len(v) > 10:
             raise ValueError("Maximum 10 symbols allowed")
-        return [s.upper().strip() for s in v]
+        cleaned = [s.upper().strip() for s in v]
+        for s in cleaned:
+            if not SYMBOL_RE.match(s):
+                raise ValueError(f"Invalid symbol: {s}")
+        return cleaned
 
     @field_validator("schedule")
     @classmethod
@@ -78,9 +96,11 @@ async def health():
 
 
 @app.get("/api/search")
-async def search_symbols(q: str = Query(..., min_length=1, max_length=10)):
+@limiter.limit("30/minute")
+async def search_symbols(request: Request, q: str = Query(..., min_length=1, max_length=10)):
     """Proxy Yahoo Finance symbol search — avoids CORS from browser."""
-    if len(q) < 1:
+    # Only allow alphanumeric search queries
+    if not re.match(r'^[A-Za-z0-9\s]+$', q):
         return []
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -95,7 +115,6 @@ async def search_symbols(q: str = Query(..., min_length=1, max_length=10)):
         for quote in data.get("quotes", []):
             if quote.get("quoteType") not in ("EQUITY", "ETF"):
                 continue
-            # Skip if symbol contains dots or special chars (foreign listings)
             sym = quote.get("symbol", "")
             if "." in sym or len(sym) > 6:
                 continue
@@ -113,7 +132,8 @@ async def search_symbols(q: str = Query(..., min_length=1, max_length=10)):
 
 
 @app.post("/api/subscribe")
-async def subscribe(req: SubscribeRequest):
+@limiter.limit("5/minute")
+async def subscribe(request: Request, req: SubscribeRequest):
     """Register or update a user subscription."""
     token = secrets.token_urlsafe(32)
 
@@ -129,7 +149,6 @@ async def subscribe(req: SubscribeRequest):
         logger.error(f"Subscribe failed for {req.email}: {e}")
         raise HTTPException(status_code=500, detail="Subscription failed. Please try again.")
 
-    # Send welcome email
     try:
         _send_welcome_email(req.email, req.symbols, req.schedule)
     except Exception as e:
@@ -144,8 +163,12 @@ async def subscribe(req: SubscribeRequest):
 
 
 @app.get("/api/unsubscribe", response_class=HTMLResponse)
-async def unsubscribe(token: str = Query(...)):
+async def unsubscribe(token: str = Query(..., min_length=10, max_length=100)):
     """Unsubscribe via token link from email footer."""
+    # Only allow URL-safe base64 characters in token
+    if not re.match(r'^[A-Za-z0-9_\-]+$', token):
+        return HTMLResponse(_unsubscribe_html("Invalid unsubscribe link."), status_code=400)
+
     user = get_user_by_token(token)
     if not user:
         return HTMLResponse(_unsubscribe_html("Invalid or expired unsubscribe link."), status_code=404)
@@ -163,7 +186,8 @@ async def unsubscribe(token: str = Query(...)):
 async def trigger_run(request: Request):
     """Internal endpoint — trigger analysis run for all users (GitHub Actions calls this)."""
     api_key = request.headers.get("X-API-Key")
-    if api_key != os.getenv("API_SECRET_KEY", ""):
+    expected = os.getenv("API_SECRET_KEY", "")
+    if not expected or api_key != expected:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     from src.alerts.engine import run_for_all_users
@@ -205,8 +229,7 @@ def _send_welcome_email(email: str, symbols: list[str], schedule: str):
               <td style="padding:8px;font-weight:600;">{schedule_label}</td></tr>
         </table>
         <p style="color:#555;font-size:13px;">
-          Your first alert will arrive at the next scheduled run.<br>
-          <a href="#" style="color:#1a1a2e;">Manage your subscription</a>
+          Your first alert will arrive at the next scheduled run.
         </p>
         <p style="color:#aaa;font-size:11px;margin-top:24px;border-top:1px solid #eee;padding-top:12px;">
           Not financial advice. Stock Alert System.
@@ -215,7 +238,7 @@ def _send_welcome_email(email: str, symbols: list[str], schedule: str):
     </div>
     """
     resend.Emails.send({
-        "from": "Stock Alerts <onboarding@resend.dev>",
+        "from": "Stock Alerts <alerts@theknightcodes.com>",
         "to": [email],
         "subject": "[StockAlert] You're subscribed!",
         "html": html,

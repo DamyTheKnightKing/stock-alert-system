@@ -2,6 +2,7 @@
 # Analysis deps (pandas, yfinance, pandas-ta etc.) only needed in GitHub Actions
 
 fastapi>=0.111.0
+slowapi>=0.1.9
 uvicorn>=0.29.0
 pydantic[email]>=2.0.0
 httpx>=0.27.0
