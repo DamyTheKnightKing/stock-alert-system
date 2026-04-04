@@ -17,4 +17,4 @@ services:
       - key: API_SECRET_KEY
         sync: false        # random secret for internal calls
       - key: ALLOWED_ORIGIN
-        value: https://theknightcodes.github.io
+        value: https://theknightcodes.com

@@ -37,7 +37,7 @@ def _render(template_file: str, **context) -> str:
             logger.warning(f"MJML warning: {err}")
     return result.html
 
-FROM_EMAIL = "Stock Alerts <alerts@theknightcodes.dev>"
+FROM_EMAIL = "Stock Alerts <alerts@theknightcodes.com>"
 
 
 # ---------------------------------------------------------------------------
