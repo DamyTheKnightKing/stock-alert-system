@@ -2,7 +2,7 @@ name: Keep API Warm
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # every 10 minutes
+    - cron: "*/14 * * * *"   # every 14 minutes (~3,000 runs/month — within free tier)
   workflow_dispatch:
 
 jobs:
