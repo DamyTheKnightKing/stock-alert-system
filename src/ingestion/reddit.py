@@ -123,11 +123,10 @@ def _search_all_subreddits(query: str, cutoff: datetime) -> list[dict]:
 def _fetch_subreddit(subreddit: str, query: str, cutoff: datetime) -> list[dict]:
     url = f"https://www.reddit.com/r/{subreddit}/search.json"
     params = {
-        "q": f'"{query}"',
+        "q": query,        # plain ticker — no quotes, no restrict_sr (both kill results)
         "sort": "new",
-        "t": "day",
+        "t": "week",       # week window so cutoff filter handles the 24h boundary
         "limit": 25,
-        "restrict_sr": "true",
     }
 
     resp = httpx.get(url, params=params, headers=_HEADERS, timeout=10.0)
