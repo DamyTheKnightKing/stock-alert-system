@@ -152,6 +152,14 @@ def run_for_all_users() -> int:
             sector = fundamentals.get("sector", "")
             asset_type = "etf" if not sector or sector == "Unknown" else "stock"
             analysis = sig_engine.build_full_analysis(snap, fundamentals, asset_type)
+            try:
+                analysis.news = fetch_news(symbol, max_items=3)
+            except Exception:
+                pass
+            try:
+                analysis.reddit = fetch_reddit_sentiment(symbol)
+            except Exception:
+                pass
             symbol_analysis[symbol] = analysis
         except Exception as e:
             logger.error(f"Analysis failed for {symbol}: {e}")
