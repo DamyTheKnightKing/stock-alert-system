@@ -6,6 +6,20 @@ Subscribers pick their watchlist once. Every morning before market open, the sys
 
 Near-zero infrastructure cost — runs entirely on free tiers. Only cost is the domain (~$10/year).
 
+## Cost Breakdown
+
+| Service | What it does | Plan | Cost |
+|---------|-------------|------|------|
+| GitHub Actions | Scheduling + automation | Free tier | $0 |
+| GitHub Pages | Signup form hosting | Free | $0 |
+| Render.com | FastAPI backend | Free tier | $0 |
+| Turso | Cloud database (libSQL) | Free tier (500MB) | $0 |
+| Yahoo Finance | Market data via yfinance | Free, no API key | $0 |
+| Resend | Email delivery | Free tier (3,000/month) | $0 |
+| Cloudflare | Domain DNS + DDoS + SSL | Free | $0 |
+| **theknightcodes.com** | **Custom domain** | **Cloudflare Registrar** | **~$10.44/year** |
+| **Total** | | | **~$0.87/month** |
+
 ---
 
 ## Architecture
@@ -39,6 +53,7 @@ Near-zero infrastructure cost — runs entirely on free tiers. Only cost is the 
 | Analysis | Pure pandas/numpy — RSI, MACD, Bollinger Bands, SMA |
 | Email | Resend (3,000 emails/month free) |
 | Scheduling | GitHub Actions — cron on Ubuntu runners |
+| Domain & DNS | Cloudflare — theknightcodes.com + SSL + DDoS protection |
 
 ---
 
