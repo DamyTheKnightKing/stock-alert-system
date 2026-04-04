@@ -384,6 +384,96 @@
   // ─── CONFIG ───────────────────────────────────────────────────────────────
   const API_BASE = 'https://stock-alert-system-tods.onrender.com';
 
+  // ─── CURATED FALLBACK LIST ────────────────────────────────────────────────
+  // Used when Yahoo Finance API is unavailable — covers most popular symbols
+  const POPULAR_US = [
+    {symbol:'AAPL',  name:'Apple Inc.',                   type:'EQUITY'},
+    {symbol:'MSFT',  name:'Microsoft Corporation',         type:'EQUITY'},
+    {symbol:'GOOGL', name:'Alphabet Inc.',                 type:'EQUITY'},
+    {symbol:'AMZN',  name:'Amazon.com Inc.',               type:'EQUITY'},
+    {symbol:'NVDA',  name:'NVIDIA Corporation',            type:'EQUITY'},
+    {symbol:'META',  name:'Meta Platforms Inc.',           type:'EQUITY'},
+    {symbol:'TSLA',  name:'Tesla Inc.',                    type:'EQUITY'},
+    {symbol:'NFLX',  name:'Netflix Inc.',                  type:'EQUITY'},
+    {symbol:'AMD',   name:'Advanced Micro Devices',        type:'EQUITY'},
+    {symbol:'INTC',  name:'Intel Corporation',             type:'EQUITY'},
+    {symbol:'BABA',  name:'Alibaba Group',                 type:'EQUITY'},
+    {symbol:'ORCL',  name:'Oracle Corporation',            type:'EQUITY'},
+    {symbol:'CRM',   name:'Salesforce Inc.',               type:'EQUITY'},
+    {symbol:'UBER',  name:'Uber Technologies',             type:'EQUITY'},
+    {symbol:'SHOP',  name:'Shopify Inc.',                  type:'EQUITY'},
+    {symbol:'PYPL',  name:'PayPal Holdings',               type:'EQUITY'},
+    {symbol:'COIN',  name:'Coinbase Global',               type:'EQUITY'},
+    {symbol:'PLTR',  name:'Palantir Technologies',         type:'EQUITY'},
+    {symbol:'SOFI',  name:'SoFi Technologies',             type:'EQUITY'},
+    {symbol:'SNAP',  name:'Snap Inc.',                     type:'EQUITY'},
+    {symbol:'DIS',   name:'The Walt Disney Company',       type:'EQUITY'},
+    {symbol:'BAC',   name:'Bank of America',               type:'EQUITY'},
+    {symbol:'JPM',   name:'JPMorgan Chase',                type:'EQUITY'},
+    {symbol:'GS',    name:'Goldman Sachs',                 type:'EQUITY'},
+    {symbol:'V',     name:'Visa Inc.',                     type:'EQUITY'},
+    {symbol:'MA',    name:'Mastercard Inc.',               type:'EQUITY'},
+    {symbol:'WMT',   name:'Walmart Inc.',                  type:'EQUITY'},
+    {symbol:'COST',  name:'Costco Wholesale',              type:'EQUITY'},
+    {symbol:'KO',    name:'Coca-Cola Company',             type:'EQUITY'},
+    {symbol:'PEP',   name:'PepsiCo Inc.',                  type:'EQUITY'},
+    {symbol:'SNDK',  name:'SanDisk Corporation',           type:'EQUITY'},
+    {symbol:'WDC',   name:'Western Digital',               type:'EQUITY'},
+    {symbol:'SPY',   name:'SPDR S&P 500 ETF',             type:'ETF'},
+    {symbol:'QQQ',   name:'Invesco QQQ Trust (NASDAQ)',    type:'ETF'},
+    {symbol:'IWM',   name:'iShares Russell 2000 ETF',      type:'ETF'},
+    {symbol:'VTI',   name:'Vanguard Total Stock Market',   type:'ETF'},
+    {symbol:'VOO',   name:'Vanguard S&P 500 ETF',         type:'ETF'},
+    {symbol:'GLD',   name:'SPDR Gold Trust ETF',           type:'ETF'},
+    {symbol:'SLV',   name:'iShares Silver Trust ETF',      type:'ETF'},
+    {symbol:'TLT',   name:'iShares 20+ Year Treasury ETF', type:'ETF'},
+    {symbol:'XLF',   name:'Financial Select Sector SPDR',  type:'ETF'},
+    {symbol:'XLE',   name:'Energy Select Sector SPDR',     type:'ETF'},
+    {symbol:'ARKK',  name:'ARK Innovation ETF',            type:'ETF'},
+  ];
+
+  const POPULAR_INDIA = [
+    {symbol:'RELIANCE.NS',  name:'Reliance Industries',      type:'EQUITY'},
+    {symbol:'TCS.NS',       name:'Tata Consultancy Services', type:'EQUITY'},
+    {symbol:'INFY.NS',      name:'Infosys Limited',           type:'EQUITY'},
+    {symbol:'HDFCBANK.NS',  name:'HDFC Bank',                 type:'EQUITY'},
+    {symbol:'ICICIBANK.NS', name:'ICICI Bank',                type:'EQUITY'},
+    {symbol:'HINDUNILVR.NS',name:'Hindustan Unilever',        type:'EQUITY'},
+    {symbol:'SBIN.NS',      name:'State Bank of India',       type:'EQUITY'},
+    {symbol:'BAJFINANCE.NS',name:'Bajaj Finance',             type:'EQUITY'},
+    {symbol:'WIPRO.NS',     name:'Wipro Limited',             type:'EQUITY'},
+    {symbol:'ADANIENT.NS',  name:'Adani Enterprises',         type:'EQUITY'},
+    {symbol:'ADANIPORTS.NS',name:'Adani Ports & SEZ',         type:'EQUITY'},
+    {symbol:'TATAMOTORS.NS',name:'Tata Motors',               type:'EQUITY'},
+    {symbol:'TATASTEEL.NS', name:'Tata Steel',                type:'EQUITY'},
+    {symbol:'AXISBANK.NS',  name:'Axis Bank',                 type:'EQUITY'},
+    {symbol:'KOTAKBANK.NS', name:'Kotak Mahindra Bank',       type:'EQUITY'},
+    {symbol:'MARUTI.NS',    name:'Maruti Suzuki',             type:'EQUITY'},
+    {symbol:'SUNPHARMA.NS', name:'Sun Pharmaceutical',        type:'EQUITY'},
+    {symbol:'ONGC.NS',      name:'Oil & Natural Gas Corp',    type:'EQUITY'},
+    {symbol:'NTPC.NS',      name:'NTPC Limited',              type:'EQUITY'},
+    {symbol:'POWERGRID.NS', name:'Power Grid Corporation',    type:'EQUITY'},
+    {symbol:'ITC.NS',       name:'ITC Limited',               type:'EQUITY'},
+    {symbol:'HCLTECH.NS',   name:'HCL Technologies',          type:'EQUITY'},
+    {symbol:'TECHM.NS',     name:'Tech Mahindra',             type:'EQUITY'},
+    {symbol:'LT.NS',        name:'Larsen & Toubro',           type:'EQUITY'},
+    {symbol:'ULTRACEMCO.NS',name:'UltraTech Cement',          type:'EQUITY'},
+    {symbol:'NIFTY50.NS',   name:'Nifty 50 Index',            type:'ETF'},
+    {symbol:'SENSEX.BO',    name:'BSE Sensex Index',          type:'ETF'},
+  ];
+
+  function searchLocal(q, market) {
+    const query = q.toLowerCase();
+    let pool = [];
+    if (market === 'us')    pool = POPULAR_US;
+    if (market === 'india') pool = POPULAR_INDIA;
+    if (market === 'both')  pool = [...POPULAR_US, ...POPULAR_INDIA];
+    return pool.filter(s =>
+      s.symbol.toLowerCase().includes(query) ||
+      s.name.toLowerCase().includes(query)
+    ).slice(0, 6).map(s => ({...s, market: s.symbol.endsWith('.NS') || s.symbol.endsWith('.BO') ? 'india' : 'us'}));
+  }
+
   // ─── SECURITY: HTML escape helper ─────────────────────────────────────────
   function escapeHtml(str) {
     return String(str)
@@ -457,14 +547,18 @@
   });
 
   async function fetchSymbols(q) {
+    const market = getMarket();
+    // Show local results immediately so the dropdown is never empty
+    const local = searchLocal(q, market);
+    if (local.length) renderDropdown(local);
+    // Try API — replace with live results if they come back
     try {
-      const market = getMarket();
       const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}&market=${market}`);
       if (!res.ok) return;
       const results = await res.json();
-      renderDropdown(results);
+      if (results.length) renderDropdown(results);
     } catch {
-      hideDropdown();
+      // Keep showing local fallback results
     }
   }
 
