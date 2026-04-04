@@ -46,8 +46,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Valid stock symbol: 1-6 uppercase letters/numbers only
-SYMBOL_RE = re.compile(r'^[A-Z0-9]{1,6}$')
+# Valid stock symbol: US (1-6 chars) or Indian with .NS/.BO suffix
+SYMBOL_RE = re.compile(r'^[A-Z0-9]{1,10}(\.(NS|BO))?$')
 
 
 @app.on_event("startup")
@@ -64,6 +64,7 @@ class SubscribeRequest(BaseModel):
     email: EmailStr
     symbols: list[str]
     schedule: str = "morning"
+    market: str = "us"
 
     @field_validator("symbols")
     @classmethod
@@ -85,6 +86,13 @@ class SubscribeRequest(BaseModel):
             raise ValueError("Schedule must be morning, evening, or both")
         return v
 
+    @field_validator("market")
+    @classmethod
+    def validate_market(cls, v):
+        if v not in ("us", "india", "both"):
+            raise ValueError("Market must be us, india, or both")
+        return v
+
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -97,16 +105,21 @@ async def health():
 
 @app.get("/api/search")
 @limiter.limit("30/minute")
-async def search_symbols(request: Request, q: str = Query(..., min_length=1, max_length=10)):
+async def search_symbols(
+    request: Request,
+    q: str = Query(..., min_length=1, max_length=20),
+    market: str = Query("us"),
+):
     """Proxy Yahoo Finance symbol search — avoids CORS from browser."""
-    # Only allow alphanumeric search queries
     if not re.match(r'^[A-Za-z0-9\s]+$', q):
         return []
+    if market not in ("us", "india", "both"):
+        market = "us"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
                 "https://query1.finance.yahoo.com/v1/finance/search",
-                params={"q": q, "quotesCount": 8, "newsCount": 0, "enableFuzzyQuery": False},
+                params={"q": q, "quotesCount": 10, "newsCount": 0, "enableFuzzyQuery": False},
                 headers={"User-Agent": "Mozilla/5.0 (compatible; StockAlertBot/1.0)"},
             )
             data = resp.json()
@@ -116,13 +129,27 @@ async def search_symbols(request: Request, q: str = Query(..., min_length=1, max
             if quote.get("quoteType") not in ("EQUITY", "ETF"):
                 continue
             sym = quote.get("symbol", "")
-            if "." in sym or len(sym) > 6:
+            exchange = quote.get("exchange", "")
+
+            # Filter by market
+            is_indian = sym.endswith(".NS") or sym.endswith(".BO")
+            is_us = not is_indian and "." not in sym and len(sym) <= 6
+
+            if market == "us" and not is_us:
                 continue
+            if market == "india" and not is_indian:
+                continue
+            # market == "both" — allow all
+
+            if not is_indian and not is_us:
+                continue
+
             results.append({
                 "symbol": sym,
                 "name": quote.get("longname") or quote.get("shortname", sym),
                 "type": quote.get("quoteType", ""),
-                "exchange": quote.get("exchange", ""),
+                "exchange": exchange,
+                "market": "india" if is_indian else "us",
             })
         return results[:6]
 
@@ -142,6 +169,7 @@ async def subscribe(request: Request, req: SubscribeRequest):
             "email": req.email,
             "watchlist": json.dumps(req.symbols),
             "schedule": req.schedule,
+            "market": req.market,
             "active": 1,
             "unsubscribe_token": token,
         })
@@ -154,11 +182,12 @@ async def subscribe(request: Request, req: SubscribeRequest):
     except Exception as e:
         logger.warning(f"Welcome email failed: {e}")
 
-    logger.info(f"New subscriber: {req.email} | symbols={req.symbols} | schedule={req.schedule}")
+    logger.info(f"New subscriber: {req.email} | symbols={req.symbols} | schedule={req.schedule} | market={req.market}")
     return {
         "message": "Subscribed successfully! Check your email for confirmation.",
         "symbols": req.symbols,
         "schedule": req.schedule,
+        "market": req.market,
     }
 
 

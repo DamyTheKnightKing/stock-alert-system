@@ -151,6 +151,40 @@
       margin-top: 4px;
     }
 
+    /* Market selector */
+    .market-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .market-option input[type="radio"] { display: none; }
+    .market-option label {
+      display: block;
+      text-align: center;
+      padding: 10px 8px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #555;
+    }
+    .market-option input[type="radio"]:checked + label {
+      border-color: #1a1a2e;
+      background: #1a1a2e;
+      color: #fff;
+    }
+    .market-sub {
+      font-size: 10px;
+      font-weight: 400;
+      display: block;
+      margin-top: 2px;
+      opacity: 0.75;
+    }
+
     /* Schedule */
     .schedule-options {
       display: grid;
@@ -263,12 +297,40 @@
         <input type="email" id="email" placeholder="you@gmail.com" required autocomplete="email">
       </div>
 
+      <!-- Market Selector -->
+      <div class="form-group">
+        <label>Market</label>
+        <div class="market-options">
+          <div class="market-option">
+            <input type="radio" name="market" id="mkt_us" value="us" checked>
+            <label for="mkt_us">
+              🇺🇸 US
+              <span class="market-sub">NYSE / NASDAQ</span>
+            </label>
+          </div>
+          <div class="market-option">
+            <input type="radio" name="market" id="mkt_india" value="india">
+            <label for="mkt_india">
+              🇮🇳 India
+              <span class="market-sub">NSE / BSE</span>
+            </label>
+          </div>
+          <div class="market-option">
+            <input type="radio" name="market" id="mkt_both" value="both">
+            <label for="mkt_both">
+              🌍 Both
+              <span class="market-sub">US + India</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- Symbol Search -->
       <div class="form-group">
         <label>Stock Symbols <span style="color:#bbb;font-weight:400;text-transform:none;letter-spacing:0">(up to 10)</span></label>
         <div class="search-wrap">
           <input type="text" class="search-input" id="symbolSearch"
-                 placeholder="Type ticker or company name (e.g. AAPL, Tesla...)"
+                 placeholder="Type ticker or company name..."
                  autocomplete="off">
           <div class="dropdown" id="dropdown"></div>
         </div>
@@ -284,14 +346,14 @@
             <input type="radio" name="schedule" id="sch_morning" value="morning" checked>
             <label for="sch_morning">
               Morning
-              <span class="schedule-time">8:30 AM ET</span>
+              <span class="schedule-time" id="time_morning">8:30 AM ET</span>
             </label>
           </div>
           <div class="schedule-option">
             <input type="radio" name="schedule" id="sch_evening" value="evening">
             <label for="sch_evening">
               Evening
-              <span class="schedule-time">4:30 PM ET</span>
+              <span class="schedule-time" id="time_evening">4:30 PM ET</span>
             </label>
           </div>
           <div class="schedule-option">
@@ -339,6 +401,38 @@
   const spinner      = document.getElementById('spinner');
   const submitText   = document.getElementById('submitText');
 
+  // ─── MARKET SELECTOR ──────────────────────────────────────────────────────
+  const SCHEDULE_TIMES = {
+    us:     { morning: '8:30 AM ET',   evening: '4:30 PM ET' },
+    india:  { morning: '9:15 AM IST',  evening: '3:30 PM IST' },
+    both:   { morning: '8:30 AM ET / 9:15 AM IST', evening: '4:30 PM ET / 3:30 PM IST' },
+  };
+
+  function getMarket() {
+    return document.querySelector('input[name="market"]:checked').value;
+  }
+
+  function updateScheduleTimes() {
+    const m = getMarket();
+    document.getElementById('time_morning').textContent = SCHEDULE_TIMES[m].morning;
+    document.getElementById('time_evening').textContent = SCHEDULE_TIMES[m].evening;
+    const placeholder = m === 'india'
+      ? 'Type ticker (e.g. RELIANCE, TCS, INFY...)'
+      : m === 'both'
+      ? 'Type ticker (e.g. AAPL, RELIANCE...)'
+      : 'Type ticker or company name (e.g. AAPL, Tesla...)';
+    searchInput.placeholder = placeholder;
+  }
+
+  document.querySelectorAll('input[name="market"]').forEach(el => {
+    el.addEventListener('change', () => {
+      updateScheduleTimes();
+      selectedSymbols.length = 0;
+      renderChips();
+      hideDropdown();
+    });
+  });
+
   // ─── SYMBOL SEARCH ────────────────────────────────────────────────────────
   searchInput.addEventListener('input', () => {
     const q = searchInput.value.trim();
@@ -357,12 +451,12 @@
 
   async function fetchSymbols(q) {
     try {
-      const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
+      const market = getMarket();
+      const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}&market=${market}`);
       if (!res.ok) return;
       const results = await res.json();
       renderDropdown(results);
     } catch {
-      // API not reachable — show nothing
       hideDropdown();
     }
   }
@@ -438,6 +532,7 @@
 
     const email    = document.getElementById('email').value.trim();
     const schedule = document.querySelector('input[name="schedule"]:checked').value;
+    const market   = getMarket();
 
     if (!email) { showAlert('Please enter your email address.', 'error'); return; }
     if (selectedSymbols.length === 0) { showAlert('Please select at least one symbol.', 'error'); return; }
@@ -448,7 +543,7 @@
       const res = await fetch(`${API_BASE}/api/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, symbols: selectedSymbols, schedule }),
+        body: JSON.stringify({ email, symbols: selectedSymbols, schedule, market }),
       });
 
       const data = await res.json();

@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS users (
     email               TEXT NOT NULL UNIQUE,
     watchlist           TEXT NOT NULL,
     schedule            TEXT DEFAULT 'morning',
+    market              TEXT DEFAULT 'us',
     active              INTEGER DEFAULT 1,
     unsubscribe_token   TEXT NOT NULL,
     created_at          TEXT DEFAULT (datetime('now')),
@@ -211,6 +212,12 @@ def init_db():
             s = stmt.strip()
             if s:
                 conn.execute(s)
+        # Migration: add market column to existing users tables
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN market TEXT DEFAULT 'us'")
+            logger.info("Migration: added market column to users table")
+        except Exception:
+            pass  # Column already exists
     logger.info(f"Database initialized: {DATABASE_URL.split('?')[0]}")
 
 
@@ -346,16 +353,18 @@ def purge_old_records(retention_days: int = 90):
 def save_user(data: dict):
     with _db() as conn:
         conn.execute("""
-            INSERT INTO users (email, watchlist, schedule, active, unsubscribe_token)
-            VALUES (?,?,?,?,?)
+            INSERT INTO users (email, watchlist, schedule, market, active, unsubscribe_token)
+            VALUES (?,?,?,?,?,?)
             ON CONFLICT(email) DO UPDATE SET
                 watchlist         = excluded.watchlist,
                 schedule          = excluded.schedule,
+                market            = excluded.market,
                 active            = 1,
                 updated_at        = datetime('now')
         """, (
             data["email"], data["watchlist"],
             data.get("schedule", "morning"),
+            data.get("market", "us"),
             data.get("active", 1),
             data["unsubscribe_token"],
         ))
