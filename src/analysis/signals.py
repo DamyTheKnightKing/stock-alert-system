@@ -72,6 +72,8 @@ class FullAnalysis:
     alerts: list[Alert] = field(default_factory=list)
     technical: Optional[TechnicalSnapshot] = None
     fundamentals: Optional[dict] = None
+    news: list = field(default_factory=list)           # list[NewsItem] — v2
+    reddit: Optional[object] = None                    # RedditSentiment — v2
     generated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
