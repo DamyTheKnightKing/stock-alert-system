@@ -232,7 +232,7 @@ def _unsubscribe_html(message: str, success: bool = False) -> str:
       <div style="font-size:40px;">{'✓' if success else '✗'}</div>
       <h2 style="color:{color};margin:12px 0;">{'Unsubscribed' if success else 'Error'}</h2>
       <p style="color:#555;">{message}</p>
-      <a href="https://theknightcodes.com"
+      <a href="https://alerts.theknightcodes.com"
          style="display:inline-block;margin-top:16px;padding:10px 24px;
                 background:#1a1a2e;color:#fff;border-radius:6px;text-decoration:none;">
         Subscribe Again
