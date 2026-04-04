@@ -390,6 +390,88 @@
 
     <mj-section background-color="#f0f2f5" padding="6px 0" />
 
+    <!-- ═══════════════════════════════════════════ NEWS & REDDIT SENTIMENT -->
+    {% set featured = (top_etfs + top_stocks) %}
+    {% if featured %}
+    <mj-section background-color="#ffffff" padding="16px 24px 4px 24px">
+      <mj-column>
+        <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
+                 letter-spacing="1px" color="#888" padding="0 0 4px 0"
+                 border-bottom="1px solid #f0f0f0">
+          Market Intelligence — News &amp; Social Sentiment
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {% for a in featured %}
+    {% if a.news or a.reddit %}
+    <mj-section background-color="#ffffff" padding="6px 24px">
+      <mj-column>
+        <mj-text padding="10px 14px" background-color="#f8f9fa" border-radius="8px">
+
+          <!-- Symbol header row -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+            <tr>
+              <td>
+                <span style="font-size:14px;font-weight:700;color:#1a1a2e;">{{ a.symbol }}</span>
+                <span style="font-size:11px;color:#888;margin-left:6px;">
+                  {{ a.fundamentals.get('name', '') if a.fundamentals else '' }}
+                </span>
+              </td>
+              {% if a.reddit and a.reddit.mention_count > 0 %}
+              {% set reddit_color = '#2ecc71' if a.reddit.overall == 'bullish' else '#e74c3c' if a.reddit.overall == 'bearish' else '#888' %}
+              <td align="right">
+                <span style="font-size:10px;color:#888;">Reddit&nbsp;</span>
+                <span style="font-size:11px;font-weight:700;color:{{ reddit_color }};">
+                  {{ a.reddit.overall | upper }}
+                </span>
+                <span style="font-size:10px;color:#aaa;">&nbsp;({{ a.reddit.mention_count }} mentions)</span>
+              </td>
+              {% endif %}
+            </tr>
+          </table>
+
+          <!-- News headlines -->
+          {% if a.news %}
+          {% for item in a.news %}
+          {% set dot_color = '#2ecc71' if item.sentiment_hint == 'positive' else '#e74c3c' if item.sentiment_hint == 'negative' else '#aaa' %}
+          <div style="padding:5px 0;border-bottom:1px solid #eee;font-size:12px;line-height:1.5;">
+            <span style="color:{{ dot_color }};font-size:14px;vertical-align:middle;">●</span>
+            &nbsp;
+            <span style="color:#333;">{{ item.title[:90] }}{{ '…' if item.title|length > 90 else '' }}</span>
+            <span style="color:#aaa;font-size:10px;margin-left:6px;">{{ item.source }}</span>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          <!-- Reddit top post preview -->
+          {% if a.reddit and a.reddit.top_posts %}
+          {% set rp = a.reddit.top_posts[0] %}
+          {% set rp_color = '#2ecc71' if rp.sentiment == 'bullish' else '#e74c3c' if rp.sentiment == 'bearish' else '#aaa' %}
+          <div style="padding:6px 0 2px 0;font-size:11px;color:#888;">
+            <span style="color:{{ rp_color }};">●</span>
+            &nbsp;r/{{ rp.subreddit }}: {{ rp.title[:80] }}{{ '…' if rp.title|length > 80 else '' }}
+            <span style="color:#bbb;">({{ rp.score }} pts)</span>
+          </div>
+          {% endif %}
+
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    {% endif %}
+    {% endfor %}
+
+    <mj-section background-color="#ffffff" padding="0 24px 10px 24px">
+      <mj-column>
+        <mj-text font-size="10px" color="#bbb" padding="4px 0 0 0">
+          News: Yahoo Finance. Social sentiment: Reddit (r/wallstreetbets, r/stocks, r/investing). Keyword-based scoring only.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    {% endif %}
+
+    <mj-section background-color="#f0f2f5" padding="6px 0" />
+
     <!-- ═══════════════════════════════════════════ FOOTER -->
     <mj-section background-color="#ffffff" border-radius="0 0 10px 10px" padding="16px 24px">
       <mj-column>

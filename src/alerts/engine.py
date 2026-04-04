@@ -17,6 +17,8 @@ import yaml
 from src.analysis import signals as sig_engine
 from src.analysis import technical as tech
 from src.ingestion import fetcher
+from src.ingestion.news import fetch_news
+from src.ingestion.reddit import fetch_reddit_sentiment
 from src.storage import db
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,17 @@ def run_daily_analysis(watchlist_path: str = "config/watchlist.yml",
 
         # 4. Generate full analysis
         analysis = sig_engine.build_full_analysis(snap, fundamentals, asset_type)
+
+        # 4a. Enrich with news + Reddit sentiment (best-effort — don't block on failure)
+        try:
+            analysis.news = fetch_news(symbol, max_items=3)
+        except Exception as e:
+            logger.warning(f"{symbol}: News fetch failed — {e}")
+
+        try:
+            analysis.reddit = fetch_reddit_sentiment(symbol)
+        except Exception as e:
+            logger.warning(f"{symbol}: Reddit fetch failed — {e}")
 
         # 5. Persist price snapshot
         _persist_snapshot(snap, df)

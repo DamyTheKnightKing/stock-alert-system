@@ -108,17 +108,25 @@ class _TursoCursor:
     def description(self):
         return [(c,) for c in self._cols]
 
+    @staticmethod
+    def _val(v):
+        if not isinstance(v, dict):
+            return v
+        if v.get("type") == "null":
+            return None
+        return v.get("value")
+
     def fetchone(self):
         if self._idx >= len(self._rows):
             return None
         row = self._rows[self._idx]
         self._idx += 1
-        return [v["value"] if isinstance(v, dict) else v for v in row]
+        return [self._val(v) for v in row]
 
     def fetchall(self):
         rows = []
         for row in self._rows[self._idx:]:
-            rows.append([v["value"] if isinstance(v, dict) else v for v in row])
+            rows.append([self._val(v) for v in row])
         self._idx = len(self._rows)
         return rows
 
