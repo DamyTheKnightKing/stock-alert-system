@@ -10,13 +10,16 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import xml.etree.ElementTree as ET
+
 import httpx
 
 logger = logging.getLogger(__name__)
 
 SUBREDDITS = ["wallstreetbets", "stocks", "investing"]
 LOOKBACK_HOURS = 24
-_HEADERS = {"User-Agent": "StockAlertBot/1.0 (personal research tool)"}
+# RSS feed avoids the 403 block GitHub Actions gets on the JSON search API
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StockAlertBot/1.0)"}
 
 
 @dataclass
@@ -121,33 +124,48 @@ def _search_all_subreddits(query: str, cutoff: datetime) -> list[dict]:
 
 
 def _fetch_subreddit(subreddit: str, query: str, cutoff: datetime) -> list[dict]:
-    url = f"https://www.reddit.com/r/{subreddit}/search.json"
-    params = {
-        "q": query,        # plain ticker — no quotes, no restrict_sr (both kill results)
-        "sort": "new",
-        "t": "week",       # week window so cutoff filter handles the 24h boundary
-        "limit": 25,
-    }
+    """Use RSS feed — avoids the 403 block GitHub Actions gets on the JSON search API."""
+    url = f"https://www.reddit.com/r/{subreddit}/search.rss"
+    params = {"q": query, "sort": "new", "t": "week", "limit": 25}
 
     resp = httpx.get(url, params=params, headers=_HEADERS, timeout=10.0)
     resp.raise_for_status()
-    data = resp.json()
 
     posts = []
-    for child in data.get("data", {}).get("children", []):
-        post = child.get("data", {})
-        created = datetime.fromtimestamp(post.get("created_utc", 0), tz=timezone.utc)
-        if created < cutoff:
-            continue
-        posts.append({
-            "id": post.get("id", ""),
-            "title": post.get("title", ""),
-            "selftext": post.get("selftext", "")[:500],
-            "score": post.get("score", 0),
-            "url": f"https://reddit.com{post.get('permalink', '')}",
-            "subreddit": subreddit,
-            "created_utc": created.isoformat(),
-        })
+    try:
+        root = ET.fromstring(resp.text)
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        for entry in root.findall("atom:entry", ns):
+            title = entry.findtext("atom:title", default="", namespaces=ns).strip()
+            link  = entry.findtext("atom:link", default="", namespaces=ns)
+            # link tag uses 'href' attribute
+            link_el = entry.find("atom:link", ns)
+            link = link_el.get("href", "") if link_el is not None else ""
+            updated = entry.findtext("atom:updated", default="", namespaces=ns)
+            content = entry.findtext("atom:content", default="", namespaces=ns)[:500]
+            post_id = entry.findtext("atom:id", default="", namespaces=ns)
+
+            try:
+                created = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+            except Exception:
+                created = datetime.now(timezone.utc)
+
+            if created < cutoff:
+                continue
+            if not title:
+                continue
+
+            posts.append({
+                "id": post_id,
+                "title": title,
+                "selftext": content,
+                "score": 0,   # RSS doesn't include score
+                "url": link,
+                "subreddit": subreddit,
+                "created_utc": created.isoformat(),
+            })
+    except ET.ParseError as e:
+        logger.warning(f"RSS parse error for r/{subreddit}: {e}")
 
     return posts
 
