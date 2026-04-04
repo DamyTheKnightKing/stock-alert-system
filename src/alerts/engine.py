@@ -99,6 +99,7 @@ def run_for_all_users() -> int:
     """
     import json as _json
     import os as _os
+    import time as _time
     import resend as _resend
     from src.storage.db import get_active_users
     from src.notifications.email_sender import send_morning_digest
@@ -166,6 +167,7 @@ def run_for_all_users() -> int:
 
             processed += 1
             logger.info(f"Sent digest to {user['email']} ({len(user_analyses)} symbols)")
+            _time.sleep(1)  # Resend rate limit: max 2 requests/second
 
         except Exception as e:
             logger.error(f"Failed to process user {user.get('email')}: {e}")
