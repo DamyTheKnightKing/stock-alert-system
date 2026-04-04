@@ -4,7 +4,7 @@
 
 Subscribers pick their watchlist once. Every morning before market open, the system analyses every stock, detects trading signals, and delivers a personalised digest ranked by confidence. High-confidence intraday signals are sent in real time throughout the trading day.
 
-Zero infrastructure cost — runs entirely on free tiers.
+Near-zero infrastructure cost — runs entirely on free tiers. Only cost is the domain (~$10/year).
 
 ---
 
