@@ -1,0 +1,134 @@
+<mxfile host="app.diagrams.net" modified="2026-04-04" version="21.0.0">
+  <diagram name="Stock Alert System" id="stock-alert-architecture">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Stock Alert System — Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="450" y="30" width="600" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- SUBSCRIBER (left) -->
+        <mxCell id="sub1" value="Subscriber" style="shape=mxgraph.basic.person;fillColor=#4A90D9;strokeColor=#2C5F8A;fontColor=#ffffff;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="400" width="60" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sub1_label" value="Investor" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#555;" vertex="1" parent="1">
+          <mxGeometry x="45" y="490" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- SIGNUP FORM -->
+        <mxCell id="form" value="&lt;b&gt;Signup Form&lt;/b&gt;&lt;br&gt;GitHub Pages&lt;br&gt;&lt;font color='#888888'&gt;alerts.theknightcodes.com&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF4FB;strokeColor=#4A90D9;fontSize=12;arcSize=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220" y="390" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- API BACKEND -->
+        <mxCell id="api" value="&lt;b&gt;API Backend&lt;/b&gt;&lt;br&gt;FastAPI · Python&lt;br&gt;&lt;font color='#888888'&gt;Render.com (Free)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;fontSize=12;arcSize=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="500" y="390" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- TURSO DB -->
+        <mxCell id="db" value="&lt;b&gt;Turso Database&lt;/b&gt;&lt;br&gt;libSQL Cloud&lt;br&gt;&lt;font color='#888888'&gt;users · alerts · snapshots&lt;/font&gt;" style="shape=mxgraph.flowchart.database;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F5A623;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="780" y="385" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ALERT ENGINE -->
+        <mxCell id="engine" value="&lt;b&gt;Alert Engine&lt;/b&gt;&lt;br&gt;GitHub Actions · Python&lt;br&gt;&lt;font color='#888888'&gt;Daily 8:30 AM ET · Mon–Fri&lt;/font&gt;&lt;br&gt;&lt;font color='#888888'&gt;RSI · MACD · SMA · Bollinger&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FF9800;fontSize=12;arcSize=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="500" y="200" width="220" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- YAHOO FINANCE -->
+        <mxCell id="yahoo" value="&lt;b&gt;Yahoo Finance&lt;/b&gt;&lt;br&gt;Market Data&lt;br&gt;&lt;font color='#888888'&gt;Free · No API Key&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220" y="180" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- RESEND -->
+        <mxCell id="resend" value="&lt;b&gt;Resend&lt;/b&gt;&lt;br&gt;Email Delivery&lt;br&gt;&lt;font color='#888888'&gt;alerts@theknightcodes.com&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="780" y="180" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- SUBSCRIBER (right - receives email) -->
+        <mxCell id="sub2" value="Subscriber" style="shape=mxgraph.basic.person;fillColor=#4A90D9;strokeColor=#2C5F8A;fontColor=#ffffff;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="400" width="60" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sub2_label" value="Receives Email" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#555;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="490" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ARROWS -->
+
+        <!-- Subscriber → Signup Form -->
+        <mxCell id="e1" value="Signs up · picks watchlist" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4A90D9;fontColor=#4A90D9;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="sub1" target="form">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Signup Form → API -->
+        <mxCell id="e2" value="POST /subscribe" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4CAF50;fontColor=#4CAF50;fontSize=10;" edge="1" parent="1" source="form" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- API → Turso DB -->
+        <mxCell id="e3" value="Save subscriber" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#F5A623;fontColor=#F5A623;fontSize=10;" edge="1" parent="1" source="api" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Alert Engine → Yahoo Finance -->
+        <mxCell id="e4" value="Fetch prices" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4CAF50;fontColor=#4CAF50;fontSize=10;" edge="1" parent="1" source="engine" target="yahoo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Alert Engine → Turso DB -->
+        <mxCell id="e5" value="Read users · Write alerts" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#F5A623;fontColor=#F5A623;fontSize=10;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="engine" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Alert Engine → Resend -->
+        <mxCell id="e6" value="Send digest" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9C27B0;fontColor=#9C27B0;fontSize=10;" edge="1" parent="1" source="engine" target="resend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Resend → Subscriber -->
+        <mxCell id="e7" value="Personalised email" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9C27B0;fontColor=#9C27B0;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="resend" target="sub2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend_title" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="600" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" value="User" style="shape=mxgraph.basic.person;fillColor=#4A90D9;strokeColor=#2C5F8A;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="630" width="30" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="l1t" value="Subscriber" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="643" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" value="" style="rounded=1;fillColor=#EAF4FB;strokeColor=#4A90D9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="635" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="l2t" value="Web Layer" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="240" y="640" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" value="" style="rounded=1;fillColor=#E8F5E9;strokeColor=#4CAF50;" vertex="1" parent="1">
+          <mxGeometry x="340" y="635" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="l3t" value="Backend / Data" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="380" y="640" width="90" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" value="" style="rounded=1;fillColor=#FFF3E0;strokeColor=#FF9800;" vertex="1" parent="1">
+          <mxGeometry x="490" y="635" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="l4t" value="Automation" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="530" y="640" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="l5" value="" style="ellipse;fillColor=#F3E5F5;strokeColor=#9C27B0;" vertex="1" parent="1">
+          <mxGeometry x="630" y="635" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="l5t" value="External Service" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="670" y="640" width="100" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

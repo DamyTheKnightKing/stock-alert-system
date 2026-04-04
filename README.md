@@ -10,46 +10,7 @@ Zero infrastructure cost — runs entirely on free tiers.
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    Subscriber(["👤 Subscriber"])
-
-    subgraph Web ["&nbsp;&nbsp;&nbsp;Web Layer&nbsp;&nbsp;&nbsp;"]
-        Form["📋 Signup Form\nGitHub Pages"]
-    end
-
-    subgraph Backend ["&nbsp;&nbsp;&nbsp;Backend&nbsp;&nbsp;&nbsp;"]
-        API["⚡ API Server\nFastAPI · Render.com"]
-        DB[("🗄️ Database\nTurso · libSQL Cloud")]
-    end
-
-    subgraph Automation ["&nbsp;&nbsp;&nbsp;Automation&nbsp;&nbsp;&nbsp;"]
-        Scheduler["⏰ Alert Engine\nGitHub Actions\n─────────────────\nDaily  →  8:30 AM ET\nIntraday  →  Every 30 min"]
-        Analysis["📊 Technical Analysis\nRSI · MACD · SMA · Bollinger Bands\nSupport & Resistance · Volume"]
-    end
-
-    subgraph External ["&nbsp;&nbsp;&nbsp;External Services&nbsp;&nbsp;&nbsp;"]
-        Market["📈 Yahoo Finance\nMarket Data"]
-        Email["✉️ Resend\nEmail Delivery"]
-    end
-
-    Subscriber -->|"Signs up · picks watchlist"| Form
-    Form -->|"POST /subscribe"| API
-    API -->|"Save subscriber"| DB
-
-    Scheduler -->|"Fetch OHLCV prices"| Market
-    Market --> Analysis
-    Analysis -->|"Write snapshots & alerts"| DB
-    DB -->|"Read active subscribers"| Scheduler
-    Scheduler -->|"Send personalised digest"| Email
-    Email -->|"Morning digest & intraday alerts"| Subscriber
-
-    style Subscriber fill:#4A90D9,color:#fff,stroke:#2C5F8A
-    style Web fill:#EAF4FB,stroke:#4A90D9
-    style Backend fill:#E8F5E9,stroke:#4CAF50
-    style Automation fill:#FFF8E1,stroke:#F5A623
-    style External fill:#F3E5F5,stroke:#9C27B0
-```
+![Architecture](docs/architecture.jpg)
 
 ---
 
@@ -175,3 +136,4 @@ python -m src.main daily --all-users
 | `intraday_check.yml` | Every 30 min, 9:30 AM–4 PM ET | High-confidence intraday alerts |
 
 Both workflows can be triggered manually from the GitHub Actions tab.
+
