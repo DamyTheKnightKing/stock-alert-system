@@ -392,8 +392,7 @@
 
     <!-- ═══════════════════════════════════════════ NEWS & REDDIT SENTIMENT -->
     {% set featured = (top_etfs + top_stocks) %}
-    {% set has_intel = featured | selectattr('news') | list or featured | selectattr('reddit') | list %}
-    {% if has_intel %}
+    {% if featured %}
     <mj-section background-color="#ffffff" padding="16px 24px 4px 24px">
       <mj-column>
         <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
