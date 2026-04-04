@@ -161,9 +161,11 @@ def run_for_all_users() -> int:
 
             # Override recipient to this specific user
             original_recipients = _os.getenv("EMAIL_RECIPIENTS", "")
-            _os.environ["EMAIL_RECIPIENTS"] = user["email"]
-            send_morning_digest(digest)
-            _os.environ["EMAIL_RECIPIENTS"] = original_recipients
+            try:
+                _os.environ["EMAIL_RECIPIENTS"] = user["email"]
+                send_morning_digest(digest)
+            finally:
+                _os.environ["EMAIL_RECIPIENTS"] = original_recipients
 
             processed += 1
             logger.info(f"Sent digest to {user['email']} ({len(user_analyses)} symbols)")

@@ -38,10 +38,15 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "https://alerts.theknightcodes.com")
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+_origins = [ALLOWED_ORIGIN]
+if DEBUG:
+    _origins += ["http://localhost:8000", "http://127.0.0.1:5500"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ALLOWED_ORIGIN, "http://localhost:8000", "http://127.0.0.1:5500"],
+    allow_origins=_origins,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -54,6 +59,8 @@ SYMBOL_RE = re.compile(r'^[A-Z0-9]{1,10}(\.(NS|BO))?$')
 async def startup():
     init_db()
     logger.info("Database initialised")
+    if not os.getenv("API_SECRET_KEY"):
+        logger.warning("API_SECRET_KEY is not set — /api/run endpoint will reject all requests")
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +199,8 @@ async def subscribe(request: Request, req: SubscribeRequest):
 
 
 @app.get("/api/unsubscribe", response_class=HTMLResponse)
-async def unsubscribe(token: str = Query(..., min_length=10, max_length=100)):
+@limiter.limit("10/minute")
+async def unsubscribe(request: Request, token: str = Query(..., min_length=10, max_length=100)):
     """Unsubscribe via token link from email footer."""
     # Only allow URL-safe base64 characters in token
     if not re.match(r'^[A-Za-z0-9_\-]+$', token):
@@ -214,9 +222,9 @@ async def unsubscribe(token: str = Query(..., min_length=10, max_length=100)):
 @app.post("/api/run")
 async def trigger_run(request: Request):
     """Internal endpoint — trigger analysis run for all users (GitHub Actions calls this)."""
-    api_key = request.headers.get("X-API-Key")
+    api_key = request.headers.get("X-API-Key", "")
     expected = os.getenv("API_SECRET_KEY", "")
-    if not expected or api_key != expected:
+    if not expected or not secrets.compare_digest(api_key, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     from src.alerts.engine import run_for_all_users
@@ -224,8 +232,8 @@ async def trigger_run(request: Request):
         count = run_for_all_users()
         return {"status": "ok", "users_processed": count}
     except Exception as e:
-        logger.error(f"Run failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Run failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ---------------------------------------------------------------------------

@@ -382,8 +382,15 @@
 
 <script>
   // ─── CONFIG ───────────────────────────────────────────────────────────────
-  // After deploying to Render, replace this with your actual API URL
   const API_BASE = 'https://stock-alert-system-tods.onrender.com';
+
+  // ─── SECURITY: HTML escape helper ─────────────────────────────────────────
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
 
   // ─── STATE ────────────────────────────────────────────────────────────────
   const selectedSymbols = [];
@@ -466,12 +473,15 @@
     dropdown.innerHTML = results.map(r => {
       const already = selectedSymbols.includes(r.symbol);
       const isEtf   = r.type === 'ETF';
+      const sym     = escapeHtml(r.symbol);
+      const name    = escapeHtml(r.name);
+      const type    = escapeHtml(r.type);
       return `
         <div class="dropdown-item ${already ? 'disabled' : ''}"
-             data-symbol="${r.symbol}" data-name="${r.name}" data-type="${r.type}">
+             data-symbol="${sym}" data-name="${name}" data-type="${type}">
           <div class="item-left">
-            <span class="item-symbol">${r.symbol}</span>
-            <span class="item-name">${r.name}</span>
+            <span class="item-symbol">${sym}</span>
+            <span class="item-name">${name}</span>
           </div>
           <span class="item-badge ${isEtf ? 'etf' : ''}">${isEtf ? 'ETF' : 'Stock'}</span>
         </div>`;
@@ -519,8 +529,8 @@
     chipsHint.textContent = `${selectedSymbols.length} of ${MAX_SYMBOLS} symbols selected`;
     chipsEl.innerHTML = selectedSymbols.map(sym => `
       <div class="chip">
-        <span>${sym}</span>
-        <button class="chip-remove" onclick="removeSymbol('${sym}')" type="button">✕</button>
+        <span>${escapeHtml(sym)}</span>
+        <button class="chip-remove" onclick="removeSymbol('${escapeHtml(sym)}')" type="button">✕</button>
       </div>
     `).join('');
   }
@@ -549,10 +559,11 @@
       const data = await res.json();
 
       if (res.ok) {
+        const safeSymbols = selectedSymbols.map(escapeHtml).join(', ');
         showAlert(
           `You're subscribed! Check your inbox for a confirmation email.<br>
-           Watching: <strong>${selectedSymbols.join(', ')}</strong>`,
-          'success'
+           Watching: <strong>${safeSymbols}</strong>`,
+          'success', true
         );
         form.reset();
         selectedSymbols.length = 0;
@@ -568,8 +579,12 @@
   });
 
   // ─── UI HELPERS ───────────────────────────────────────────────────────────
-  function showAlert(msg, type) {
-    alertEl.innerHTML = msg;
+  function showAlert(msg, type, isHtml = false) {
+    if (isHtml) {
+      alertEl.innerHTML = msg;  // only called with trusted internal strings
+    } else {
+      alertEl.textContent = msg;
+    }
     alertEl.className = `alert ${type} show`;
     alertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
