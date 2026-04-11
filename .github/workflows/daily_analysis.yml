@@ -2,8 +2,7 @@ name: Daily Stock Analysis
 
 on:
   schedule:
-    # 8:30 AM ET = 13:30 UTC (before US market opens)
-    #- cron: "30 13 * * 1-5"   # Mon–Fri only
+    - cron: "30 13 * * 1-5"   # 8:30 AM ET = 13:30 UTC, Mon–Fri
   workflow_dispatch:            # allow manual trigger from GitHub UI
 
 jobs:
