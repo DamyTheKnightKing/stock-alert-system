@@ -74,6 +74,7 @@ class FullAnalysis:
     fundamentals: Optional[dict] = None
     news: list = field(default_factory=list)           # list[NewsItem] — v2
     reddit: Optional[object] = None                    # RedditSentiment — v2
+    ai_commentary: Optional[str] = None                # AI narrative — v3 OpenRouter
     generated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
@@ -394,3 +395,65 @@ def _long_term_stance(snap: TechnicalSnapshot, fundamentals: dict, asset_type: s
     if snap.trend == "BULLISH":
         return "HOLD", "Uptrend intact. No strong reason to add aggressively — hold current position."
     return "HOLD", "No clear long-term edge identified. Maintain current allocation."
+
+
+# ── AI Commentary (OpenRouter — free) ─────────────────────────────────────────
+
+_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+_OPENROUTER_HEADERS = {
+    "HTTP-Referer": "https://github.com/theknightcodes/stock-alert-system",
+    "X-Title": "Stock Alert System",
+}
+
+
+def generate_ai_commentary(analysis: "FullAnalysis") -> Optional[str]:
+    """
+    Generate a 2-3 sentence AI market narrative for a symbol via OpenRouter free models.
+    Returns None gracefully if OPENROUTER_API_KEY is not set or call fails.
+    """
+    import os
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        return None
+
+    try:
+        from openai import OpenAI
+
+        model = os.environ.get("OPENROUTER_STOCK_MODEL", "google/gemma-3-27b-it:free")
+        client = OpenAI(
+            base_url=_OPENROUTER_BASE,
+            api_key=api_key,
+            default_headers=_OPENROUTER_HEADERS,
+        )
+
+        snap = analysis.technical
+        signals_str = ", ".join(snap.signals) if snap and snap.signals else "none"
+        news_str = ""
+        if analysis.news:
+            headlines = [getattr(n, "headline", str(n)) for n in analysis.news[:3]]
+            news_str = f"\nRecent headlines: {'; '.join(headlines)}"
+
+        prompt = f"""You are a senior equity analyst. Write a 2–3 sentence market commentary for {analysis.symbol}.
+
+Technical snapshot:
+- Price: ${analysis.price:.2f}
+- Trend: {analysis.trend}, Momentum: {analysis.momentum}
+- Signals: {signals_str}
+- Short-term: {analysis.st_direction} | Entry: {analysis.st_entry_zone} | Target: {analysis.st_exit_target}
+- Confidence score: {analysis.confidence_score}/10{news_str}
+
+Write ONLY the commentary (no headers, no bullet points). Be specific, data-driven, and actionable. Max 60 words."""
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=120,
+            temperature=0.4,
+        )
+        commentary = response.choices[0].message.content.strip()
+        logger.info("AI commentary generated for %s (%d chars)", analysis.symbol, len(commentary))
+        return commentary
+
+    except Exception as exc:
+        logger.warning("AI commentary failed for %s: %s", analysis.symbol, exc)
+        return None
