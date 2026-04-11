@@ -212,9 +212,11 @@ async def unsubscribe(request: Request, token: str = Query(..., min_length=10, m
 
     unsubscribe_user(token)
     logger.info(f"Unsubscribed: {user.get('email')}")
+    from html import escape
+    safe_email = escape(user.get("email", ""))
     return HTMLResponse(_unsubscribe_html(
         f"You have been unsubscribed successfully.<br>"
-        f"<small style='color:#888'>{user.get('email')}</small>",
+        f"<small style='color:#888'>{safe_email}</small>",
         success=True
     ))
 
