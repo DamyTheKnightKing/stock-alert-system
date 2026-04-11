@@ -53,6 +53,7 @@ def fetch_news(symbol: str, max_items: int = 5) -> list[NewsItem]:
             unique.append(item)
 
     result = unique[:max_items]
+    result = score_news_sentiment(result)
     logger.info(f"{symbol}: {len(result)} news items fetched")
     return result
 
@@ -146,7 +147,79 @@ def _fetch_newsapi(symbol: str, max_items: int) -> list[NewsItem]:
 
 
 # ---------------------------------------------------------------------------
-# Lightweight keyword pre-screener (no AI cost)
+# Sentiment scoring — AI-powered via OpenRouter, keyword fallback
+# ---------------------------------------------------------------------------
+
+_OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+_OPENROUTER_SENTIMENT_MODEL = os.getenv(
+    "OPENROUTER_SENTIMENT_MODEL", "mistralai/mistral-small-3.1-24b-instruct:free"
+)
+_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+
+
+def score_news_sentiment(items: list) -> list:
+    """
+    Score a list of NewsItems with sentiment_hint.
+    Uses OpenRouter (batch) when OPENROUTER_API_KEY is set, else keyword fallback.
+    Mutates items in-place and returns the list.
+    """
+    if _OPENROUTER_API_KEY and items:
+        try:
+            return _ai_sentiment_batch(items)
+        except Exception as e:
+            logger.warning("AI sentiment failed (%s) — falling back to keywords", e)
+    for item in items:
+        item.sentiment_hint = _keyword_sentiment(item.title + " " + item.summary)
+    return items
+
+
+def _ai_sentiment_batch(items: list) -> list:
+    """Single OpenRouter call to score all headlines at once."""
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url=_OPENROUTER_BASE,
+        api_key=_OPENROUTER_API_KEY,
+        default_headers={"HTTP-Referer": "https://github.com/DamyTheKnightKing/stock-alert-system"},
+    )
+
+    headlines = "\n".join(
+        f"{i+1}. {item.title}" for i, item in enumerate(items)
+    )
+    prompt = (
+        "You are a financial news sentiment classifier. "
+        "Classify each headline as exactly one of: positive, negative, neutral. "
+        "Consider nuance: 'better than feared' = positive, 'in-line with estimates' = neutral. "
+        "Reply ONLY with a JSON array of strings in the same order as the input. "
+        "Example: [\"positive\", \"neutral\", \"negative\"]\n\n"
+        f"Headlines:\n{headlines}"
+    )
+
+    resp = client.chat.completions.create(
+        model=_OPENROUTER_SENTIMENT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=60,
+        temperature=0.0,
+    )
+
+    import json as _json
+    raw = resp.choices[0].message.content.strip()
+    # Strip markdown fences if present
+    raw = raw.strip("`").replace("json", "").strip()
+    labels = _json.loads(raw)
+
+    valid = {"positive", "negative", "neutral"}
+    for i, item in enumerate(items):
+        if i < len(labels) and labels[i] in valid:
+            item.sentiment_hint = labels[i]
+        else:
+            item.sentiment_hint = _keyword_sentiment(item.title + " " + item.summary)
+
+    return items
+
+
+# ---------------------------------------------------------------------------
+# Keyword fallback (used when OpenRouter is not configured)
 # ---------------------------------------------------------------------------
 
 _POSITIVE_WORDS = {
