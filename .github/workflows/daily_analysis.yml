@@ -32,6 +32,8 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_STOCK_MODEL: ${{ secrets.OPENROUTER_STOCK_MODEL }}
           LOG_LEVEL: INFO
         run: python -m src.main daily --all-users
 

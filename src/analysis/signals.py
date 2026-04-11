@@ -74,6 +74,7 @@ class FullAnalysis:
     fundamentals: Optional[dict] = None
     news: list = field(default_factory=list)           # list[NewsItem] — v2
     reddit: Optional[object] = None                    # RedditSentiment — v2
+    ai_commentary: Optional[str] = None                # AI narrative — v3 OpenRouter
     generated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
@@ -394,3 +395,102 @@ def _long_term_stance(snap: TechnicalSnapshot, fundamentals: dict, asset_type: s
     if snap.trend == "BULLISH":
         return "HOLD", "Uptrend intact. No strong reason to add aggressively — hold current position."
     return "HOLD", "No clear long-term edge identified. Maintain current allocation."
+
+
+# ── AI Commentary (OpenRouter — free) ─────────────────────────────────────────
+
+_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+_OPENROUTER_HEADERS = {
+    "HTTP-Referer": "https://github.com/theknightcodes/stock-alert-system",
+    "X-Title": "Stock Alert System",
+}
+
+
+_STOCK_MODEL_FALLBACKS = [
+    "google/gemma-3-27b-it:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-4-31b-it:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+]
+
+
+def generate_ai_commentary(analysis: "FullAnalysis") -> Optional[str]:
+    """
+    Generate a structured AI market commentary for a symbol via OpenRouter free models.
+    Tries multiple free models in order on rate-limit (429). Returns None gracefully on failure.
+    """
+    import os
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        return None
+
+    try:
+        from openai import OpenAI, RateLimitError
+
+        primary_model = os.environ.get("OPENROUTER_STOCK_MODEL", "google/gemma-3-27b-it:free")
+        model_queue = [primary_model] + [m for m in _STOCK_MODEL_FALLBACKS if m != primary_model]
+
+        client = OpenAI(
+            base_url=_OPENROUTER_BASE,
+            api_key=api_key,
+            default_headers=_OPENROUTER_HEADERS,
+        )
+
+        snap = analysis.technical
+        signals_str = ", ".join(snap.signals) if snap and snap.signals else "none"
+        rsi_val = f"{snap.rsi:.1f}" if snap and snap.rsi else "N/A"
+        sma50 = f"${snap.sma_50:.2f}" if snap and snap.sma_50 else "N/A"
+        sma200 = f"${snap.sma_200:.2f}" if snap and snap.sma_200 else "N/A"
+
+        # Get stop loss from top alert if available
+        top_alert = max(analysis.alerts, key=lambda a: a.confidence_score) if analysis.alerts else None
+        stop_str = f" | Stop: {top_alert.stop_loss}" if top_alert and top_alert.stop_loss else ""
+
+        news_str = ""
+        if analysis.news:
+            headlines = [getattr(n, "headline", str(n)) for n in analysis.news[:3]]
+            news_str = f"\nRecent headlines: {'; '.join(headlines)}"
+
+        prompt = f"""You are a senior equity analyst writing a morning briefing. Analyze {analysis.symbol} and write a structured commentary.
+
+Data:
+- Price: ${analysis.price:.2f} | Trend: {analysis.trend} | Momentum: {analysis.momentum}
+- RSI: {rsi_val} | 50 SMA: {sma50} | 200 SMA: {sma200}
+- Active signals: {signals_str}
+- Short-term call: {analysis.st_direction} | Entry: {analysis.st_entry_zone} | Target: {analysis.st_exit_target}{stop_str}
+- Confidence: {analysis.confidence_score}/10{news_str}
+
+Write EXACTLY 3 lines (no headers, no bullets, no markdown):
+Line 1 — Current setup: Describe price action and what the technicals show right now (1 sentence, ~20 words).
+Line 2 — Key level to watch: Identify the single most important price level and why it matters (1 sentence, ~20 words).
+Line 3 — Predicted move: Give a specific near-term directional call with a price target and timeframe (1 sentence, ~20 words).
+
+Be direct, specific, data-driven. Use actual price numbers."""
+
+        last_exc = None
+        for model in model_queue:
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=180,
+                    temperature=0.35,
+                )
+                commentary = response.choices[0].message.content.strip()
+                logger.info("AI commentary for %s via %s (%d chars)", analysis.symbol, model, len(commentary))
+                return commentary
+            except RateLimitError as exc:
+                logger.warning("Model %s rate-limited for %s, trying next...", model, analysis.symbol)
+                last_exc = exc
+            except Exception as exc:
+                logger.warning("Model %s failed for %s: %s", model, analysis.symbol, exc)
+                last_exc = exc
+                break  # non-rate-limit errors: don't retry with other models
+
+        logger.warning("All models exhausted for %s: %s", analysis.symbol, last_exc)
+        return None
+
+    except Exception as exc:
+        logger.warning("AI commentary failed for %s: %s", analysis.symbol, exc)
+        return None

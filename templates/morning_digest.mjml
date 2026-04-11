@@ -390,7 +390,7 @@
 
     <mj-section background-color="#f0f2f5" padding="6px 0" />
 
-    <!-- ═══════════════════════════════════════════ NEWS & REDDIT SENTIMENT -->
+    <!-- ═══════════════════════════════════════════ MARKET INTELLIGENCE (AI) -->
     {% set featured = (top_etfs + top_stocks) %}
     {% if featured %}
     <mj-section background-color="#ffffff" padding="16px 24px 4px 24px">
@@ -398,67 +398,172 @@
         <mj-text font-size="11px" font-weight="700" text-transform="uppercase"
                  letter-spacing="1px" color="#888" padding="0 0 4px 0"
                  border-bottom="1px solid #f0f0f0">
-          Market Intelligence — News &amp; Social Sentiment
+          🤖 Market Intelligence — AI Analyst Commentary
         </mj-text>
       </mj-column>
     </mj-section>
 
     {% for a in featured %}
-    <mj-section background-color="#ffffff" padding="6px 24px">
-      <mj-column>
-        <mj-text padding="10px 14px" background-color="#f8f9fa" border-radius="8px">
+    {% set trend_color = '#2ecc71' if a.trend == 'BULLISH' else '#e74c3c' if a.trend == 'BEARISH' else '#f39c12' %}
+    {% set snap = a.technical %}
+    <mj-section background-color="#ffffff" padding="4px 24px">
+      <mj-column border="1px solid #e8eaf0" border-radius="8px" padding="0">
 
-          <!-- Symbol header row -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+        <!-- Symbol + trend pill header -->
+        <mj-text background-color="#fafafa" padding="10px 14px" border-radius="8px 8px 0 0">
+          <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td>
-                <span style="font-size:14px;font-weight:700;color:#1a1a2e;">{{ a.symbol }}</span>
+                <span style="font-size:15px;font-weight:700;color:#1a1a2e;">{{ a.symbol }}</span>
                 <span style="font-size:11px;color:#888;margin-left:6px;">
                   {{ a.fundamentals.get('name', '') if a.fundamentals else '' }}
                 </span>
               </td>
-              {% if a.reddit and a.reddit.mention_count > 0 %}
-              {% set reddit_color = '#2ecc71' if a.reddit.overall == 'bullish' else '#e74c3c' if a.reddit.overall == 'bearish' else '#888' %}
               <td align="right">
-                <span style="font-size:10px;color:#888;">Reddit&nbsp;</span>
-                <span style="font-size:11px;font-weight:700;color:{{ reddit_color }};">
-                  {{ a.reddit.overall | upper }}
+                <span style="font-size:11px;font-weight:700;color:#fff;
+                             background:{{ trend_color }};
+                             padding:2px 8px;border-radius:4px;letter-spacing:0.5px;">
+                  {{ a.trend }}
                 </span>
-                <span style="font-size:10px;color:#aaa;">&nbsp;({{ a.reddit.mention_count }} mentions)</span>
+                <span style="font-size:11px;color:#888;margin-left:8px;">
+                  ${{ "%.2f"|format(a.price) }}
+                </span>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+        <!-- Signal chips row -->
+        {% if snap %}
+        <mj-text padding="8px 14px" border-top="1px solid #f0f0f0" background-color="#ffffff">
+          <table cellpadding="0" cellspacing="0">
+            <tr>
+              {% if snap.rsi %}
+              <td style="padding-right:8px;">
+                <span style="font-size:10px;background:#f0f4ff;color:#3b5bdb;
+                             padding:3px 8px;border-radius:12px;font-weight:600;">
+                  RSI {{ "%.0f"|format(snap.rsi) }}
+                </span>
+              </td>
+              {% endif %}
+              {% if snap.momentum %}
+              {% set mom_bg = '#e6f9f0' if 'BULL' in snap.momentum else '#fdecea' if 'BEAR' in snap.momentum else '#fff8e6' %}
+              {% set mom_color = '#1a7a4a' if 'BULL' in snap.momentum else '#b71c1c' if 'BEAR' in snap.momentum else '#b45309' %}
+              <td style="padding-right:8px;">
+                <span style="font-size:10px;background:{{ mom_bg }};color:{{ mom_color }};
+                             padding:3px 8px;border-radius:12px;font-weight:600;">
+                  {{ snap.momentum | replace('_', ' ') }}
+                </span>
+              </td>
+              {% endif %}
+              <td style="padding-right:8px;">
+                <span style="font-size:10px;background:#f5f5f5;color:#555;
+                             padding:3px 8px;border-radius:12px;font-weight:600;">
+                  {{ a.confidence_score }}/10 confidence
+                </span>
+              </td>
+              {% if snap.volume_signal %}
+              <td>
+                <span style="font-size:10px;background:#f5f5f5;color:#888;
+                             padding:3px 8px;border-radius:12px;font-weight:500;">
+                  Vol: {{ snap.volume_signal }}
+                </span>
               </td>
               {% endif %}
             </tr>
           </table>
+        </mj-text>
+        {% endif %}
 
-          <!-- News headlines -->
-          {% if a.news %}
+        <!-- AI Commentary — main value block -->
+        {% if a.ai_commentary %}
+        {% set lines = a.ai_commentary.split('\n') | reject('equalto', '') | list %}
+        <mj-text padding="10px 14px 12px 14px" border-top="1px solid #f0f0f0">
+          {% if lines | length >= 3 %}
+          <!-- 3-line structured output -->
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="4" style="background:#3b5bdb;border-radius:2px;">&nbsp;</td>
+              <td style="padding:0 0 0 10px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#3b5bdb;font-weight:700;margin-bottom:3px;">
+                  📊 Current Setup
+                </div>
+                <div style="font-size:13px;color:#333;line-height:1.55;">{{ lines[0] }}</div>
+              </td>
+            </tr>
+          </table>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+            <tr>
+              <td width="4" style="background:#f59e0b;border-radius:2px;">&nbsp;</td>
+              <td style="padding:0 0 0 10px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#b45309;font-weight:700;margin-bottom:3px;">
+                  ⚠️ Key Level to Watch
+                </div>
+                <div style="font-size:13px;color:#333;line-height:1.55;">{{ lines[1] }}</div>
+              </td>
+            </tr>
+          </table>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+            <tr>
+              <td width="4" style="background:#2ecc71;border-radius:2px;">&nbsp;</td>
+              <td style="padding:0 0 0 10px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#1a7a4a;font-weight:700;margin-bottom:3px;">
+                  🎯 AI Predicted Move
+                </div>
+                <div style="font-size:13px;color:#1a1a2e;font-weight:600;line-height:1.55;">{{ lines[2] }}</div>
+              </td>
+            </tr>
+          </table>
+          {% else %}
+          <!-- Fallback: show as plain paragraph if AI didn't follow 3-line format -->
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="4" style="background:#3b5bdb;border-radius:2px;">&nbsp;</td>
+              <td style="padding:0 0 0 10px;">
+                <div style="font-size:13px;color:#333;line-height:1.6;">{{ a.ai_commentary }}</div>
+              </td>
+            </tr>
+          </table>
+          {% endif %}
+        </mj-text>
+        {% else %}
+        <!-- No AI commentary: fall back to top alert condition text -->
+        {% set top_alert = a.alerts | sort(attribute='confidence_score', reverse=True) | first if a.alerts else none %}
+        <mj-text padding="10px 14px 12px 14px" border-top="1px solid #f0f0f0">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="4" style="background:#95a5a6;border-radius:2px;">&nbsp;</td>
+              <td style="padding:0 0 0 10px;">
+                <div style="font-size:13px;color:#555;line-height:1.6;font-style:italic;">
+                  {% if top_alert %}
+                  {{ top_alert.condition }}
+                  {% else %}
+                  No signal active today. Monitor for setup formation.
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+        {% endif %}
+
+        <!-- News headlines (optional — shown only if news is available) -->
+        {% if a.news %}
+        <mj-text padding="6px 14px 10px 14px" border-top="1px solid #f0f0f0" background-color="#fafafa">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:#aaa;
+                      font-weight:700;margin-bottom:6px;">Latest Headlines</div>
           {% for item in a.news %}
-          {% set dot_color = '#2ecc71' if item.sentiment_hint == 'positive' else '#e74c3c' if item.sentiment_hint == 'negative' else '#aaa' %}
-          <div style="padding:5px 0;border-bottom:1px solid #eee;font-size:12px;line-height:1.5;">
-            <span style="color:{{ dot_color }};font-size:14px;vertical-align:middle;">●</span>
-            &nbsp;
-            <span style="color:#333;">{{ item.title[:90] }}{{ '…' if item.title|length > 90 else '' }}</span>
-            <span style="color:#aaa;font-size:10px;margin-left:6px;">{{ item.source }}</span>
+          {% set dot_color = '#2ecc71' if item.sentiment_hint == 'positive' else '#e74c3c' if item.sentiment_hint == 'negative' else '#ccc' %}
+          <div style="padding:4px 0;font-size:11px;line-height:1.5;color:#444;
+                      border-bottom:1px solid #eee;">
+            <span style="color:{{ dot_color }};font-size:12px;">●</span>&nbsp;
+            {{ item.title[:85] }}{{ '…' if item.title|length > 85 else '' }}
+            <span style="color:#bbb;font-size:10px;margin-left:4px;">{{ item.source }}</span>
           </div>
           {% endfor %}
-          {% endif %}
-
-          <!-- Reddit top post preview -->
-          {% if a.reddit and a.reddit.top_posts %}
-          {% set rp = a.reddit.top_posts[0] %}
-          {% set rp_color = '#2ecc71' if rp.sentiment == 'bullish' else '#e74c3c' if rp.sentiment == 'bearish' else '#aaa' %}
-          <div style="padding:6px 0 2px 0;font-size:11px;color:#888;">
-            <span style="color:{{ rp_color }};">●</span>
-            &nbsp;r/{{ rp.subreddit }}: {{ rp.title[:80] }}{{ '…' if rp.title|length > 80 else '' }}
-            <span style="color:#bbb;">({{ rp.score }} pts)</span>
-          </div>
-          {% endif %}
-
-          {% if not a.news and not a.reddit %}
-          <div style="font-size:12px;color:#aaa;padding:4px 0;">No recent news or social data available.</div>
-          {% endif %}
-
         </mj-text>
+        {% endif %}
+
       </mj-column>
     </mj-section>
     {% endfor %}
@@ -466,7 +571,7 @@
     <mj-section background-color="#ffffff" padding="0 24px 10px 24px">
       <mj-column>
         <mj-text font-size="10px" color="#bbb" padding="4px 0 0 0">
-          News: Yahoo Finance. Social sentiment: Reddit (r/wallstreetbets, r/stocks, r/investing). Keyword-based scoring only.
+          AI commentary: OpenRouter ({{ "google/gemma-3-27b-it" }}). Predictions are algorithmic — not financial advice.
         </mj-text>
       </mj-column>
     </mj-section>

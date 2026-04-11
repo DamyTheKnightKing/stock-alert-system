@@ -2,12 +2,17 @@
 Morning Digest Builder.
 Ranks analyses by confidence, picks top 3 ETFs + top 3 stocks,
 computes market pulse, and assembles the full digest payload.
+Adds AI commentary (via OpenRouter free models) for top picks if OPENROUTER_API_KEY is set.
 """
 from dataclasses import dataclass, field
 from datetime import datetime
+import logging
+import os
 from typing import Optional
 
-from src.analysis.signals import FullAnalysis
+from src.analysis.signals import FullAnalysis, generate_ai_commentary
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -35,12 +40,19 @@ def build_digest(analyses: list[FullAnalysis]) -> MorningDigest:
     """
     Build the morning digest from a list of FullAnalysis objects.
     Separates ETFs from stocks, ranks by confidence, picks top 3 each.
+    Enriches top picks with AI commentary if OPENROUTER_API_KEY is set.
     """
     etfs    = [a for a in analyses if a.asset_type == "ETF"]
     stocks  = [a for a in analyses if a.asset_type != "ETF"]
 
     top_etfs   = _rank(etfs)[:3]
     top_stocks = _rank(stocks)[:3]
+
+    # Enrich top picks with AI commentary (graceful skip if no API key)
+    if os.environ.get("OPENROUTER_API_KEY", ""):
+        for analysis in top_etfs + top_stocks:
+            if analysis.ai_commentary is None:
+                analysis.ai_commentary = generate_ai_commentary(analysis)
 
     pulse = _build_pulse(analyses)
 
